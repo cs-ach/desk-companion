@@ -1,0 +1,12 @@
+{
+  "id": "hackernews",
+  "name": "Hacker News",
+  "requiresHost": true,
+  "widgets": [{ "name": "top_story", "size": "4x2" }],
+  "capabilities": {
+    "http": ["hacker-news.firebaseio.com"]
+  },
+  "config": [
+    { "key": "count", "type": "number", "label": "Stories to show", "default": 10 }
+  ]
+}

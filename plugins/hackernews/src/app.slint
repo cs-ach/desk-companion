@@ -1,0 +1,45 @@
+export struct Story {
+    title: string,
+    score: int,
+    by: string,
+    comments: int,
+}
+
+export component App inherits Rectangle {
+    in property <[Story]> stories: [];
+    in property <string> error: "";
+
+    callback story_opened(int);
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 6px;
+
+        if root.error != "": Text {
+            text: root.error;
+            color: #c0392b;
+        }
+
+        for story[i] in root.stories: Rectangle {
+            height: 44px;
+            HorizontalLayout {
+                spacing: 10px;
+                Text {
+                    text: story.score;
+                    width: 44px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+                VerticalLayout {
+                    Text { text: story.title; overflow: elide; }
+                    Text {
+                        text: story.by + " - " + story.comments + " comments";
+                        font-size: 11px;
+                        opacity: 0.6;
+                    }
+                }
+            }
+            TouchArea { clicked => { root.story_opened(i); } }
+        }
+    }
+}

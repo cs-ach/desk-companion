@@ -1,0 +1,10 @@
+export component App inherits Rectangle {
+    in property <string> label: "";
+    in property <int> days: 0;
+
+    VerticalLayout {
+        alignment: center;
+        Text { text: root.days; font-size: 72px; horizontal-alignment: center; }
+        Text { text: root.label; horizontal-alignment: center; }
+    }
+}
