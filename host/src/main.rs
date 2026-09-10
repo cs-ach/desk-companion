@@ -1,9 +1,20 @@
 mod sync;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use jsrt::{HostFunction, Sandbox};
 use plugin::ConfigStore;
+
+
+#[path = "js/host_functions.rs"]
+mod host_functions;
+
+#[path = "utils/http.rs"]
+mod http;
+
+const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 
 fn main() -> Result<()> {
     let dir = plugins_dir()?;
@@ -39,7 +50,26 @@ fn main() -> Result<()> {
     println!("\nconfig read from {}", store.path_for("<id>").display());
 
     let files = sync::device_manifest(&plugins)?;
-    println!("\n{} file(s) to keep in sync with the device", files.len());
+    println!("\n{} file(s) to keep in sync with the device\n", files.len());
+
+    let mut handles = Vec::new();
+    for p in &plugins {
+        let functions = vec![HostFunction {
+            name: "log",
+            build: Box::new(host_functions::log),
+        }];
+        handles.push(Sandbox::start_thread(
+            Arc::new(p.clone()),
+            PLUGIN_MEMORY_LIMIT,
+            functions,
+        ));
+    }
+
+    for handle in handles {
+        if handle.join().is_err() {
+            eprintln!("a plugin thread panicked");
+        }
+    }
 
     Ok(())
 }

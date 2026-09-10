@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/protocol", "crates/plugin", "host", "pi"]
+members = ["crates/protocol", "crates/plugin", "host", "pi", "crates/jsrt"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,6 +10,7 @@ license = "MIT"
 [workspace.dependencies]
 protocol = { path = "crates/protocol" }
 plugin = { path = "crates/plugin" }
+jsrt = { path = "crates/jsrt" }
 
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

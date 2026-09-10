@@ -1,0 +1,11 @@
+[package]
+name = "jsrt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rquickjs = { version = "0.13", features = ["futures"] }
+plugin.workspace = true
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+

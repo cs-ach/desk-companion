@@ -7,8 +7,12 @@ license.workspace = true
 [dependencies]
 protocol.workspace = true
 plugin.workspace = true
+jsrt.workspace = true
+
 
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+reqwest = "0.13.5"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
