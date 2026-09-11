@@ -11,12 +11,11 @@
 // work that happens after an `await` still counts as part of the hook, and a
 // rejection surfaces as a host-side error instead of disappearing.
 
-const FEED =
-    "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson";
-
-// USGS publishes everything its networks detect, including a lot of M0.x noise.
-// Raise this to make the plugin quieter.
-const MIN_MAGNITUDE = 1.0;
+// `config` is a host-provided global holding this plugin's resolved settings:
+// manifest defaults layered under whatever is in config.json. Secrets appear as
+// a "{{key}}" placeholder, never as plaintext.
+const FEED = config.feedUrl;
+const MIN_MAGNITUDE = config.minMagnitude;
 
 // Module-level state survives from init() through every tick(): the host keeps
 // one JS context alive per plugin for its entire lifetime, and calls into the

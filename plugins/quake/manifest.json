@@ -4,9 +4,34 @@
   "requiresHost": true,
   "tickIntervalMs": 60000,
   "widgets": [
-    { "name": "latest", "size": "2x2" }
+    {
+      "name": "latest",
+      "size": "2x2"
+    }
   ],
   "capabilities": {
-    "http": ["earthquake.usgs.gov"]
-  }
+    "http": [
+      "earthquake.usgs.gov"
+    ]
+  },
+  "config": [
+    {
+      "key": "feedUrl",
+      "type": "string",
+      "label": "USGS feed URL",
+      "default": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
+    },
+    {
+      "key": "minMagnitude",
+      "type": "number",
+      "label": "Minimum magnitude",
+      "default": 1.0
+    },
+    {
+      "key": "apiToken",
+      "type": "string",
+      "label": "API token",
+      "secret": true
+    }
+  ]
 }
