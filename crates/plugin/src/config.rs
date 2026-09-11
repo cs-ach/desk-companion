@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{Map, Value};
 
 use crate::manifest::{ConfigType, Manifest};
+use crate::secrets::Secrets;
 
 #[derive(Debug, Clone)]
 pub struct ConfigStore {
@@ -31,10 +32,7 @@ pub enum ConfigError {
 
 impl ConfigStore {
     pub fn user_default() -> Result<Self, ConfigError> {
-        let dir = dirs::config_dir()
-            .ok_or(ConfigError::NoConfigDir)?
-            .join("desk-companion")
-            .join("plugins");
+        let dir = dirs::config_dir().ok_or(ConfigError::NoConfigDir)?.join("desk");
         Ok(Self::new(dir))
     }
 
@@ -42,24 +40,26 @@ impl ConfigStore {
         Self { dir: dir.into() }
     }
 
-    pub fn path_for(&self, id: &str) -> PathBuf {
-        self.dir.join(format!("{id}.json"))
+    pub fn dir_for(&self, id: &str) -> PathBuf {
+        self.dir.join(id)
+    }
+
+    pub fn config_path(&self, id: &str) -> PathBuf {
+        self.dir_for(id).join("config.json")
+    }
+
+    pub fn secrets_path(&self, id: &str) -> PathBuf {
+        self.dir_for(id).join("secrets.json")
     }
 
     pub fn load(&self, manifest: &Manifest) -> Result<PluginConfig, ConfigError> {
-        let path = self.path_for(&manifest.id);
-
-        let stored = match fs::read_to_string(&path) {
-            Ok(raw) => match serde_json::from_str::<Value>(&raw) {
-                Ok(Value::Object(map)) => map,
-                Ok(_) => return Err(ConfigError::NotAnObject { path }),
-                Err(source) => return Err(ConfigError::Parse { path, source }),
-            },
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Map::new(),
-            Err(source) => return Err(ConfigError::Io { path, source }),
-        };
-
+        let stored = read_object(self.config_path(&manifest.id))?;
         Ok(resolve(manifest, stored))
+    }
+
+    pub fn load_secrets(&self, manifest: &Manifest) -> Result<Secrets, ConfigError> {
+        let stored = read_object(self.secrets_path(&manifest.id))?;
+        Ok(Secrets::resolve(manifest, stored))
     }
 
     pub fn save(
@@ -79,13 +79,70 @@ impl ConfigStore {
             }
         }
 
-        let path = self.path_for(&manifest.id);
-        if let Some(parent) = path.parent() {
-            create_dir_all(parent)?;
-        }
-        let body = serde_json::to_string_pretty(&Value::Object(out)).expect("map serialises");
-        fs::write(&path, body).map_err(|source| ConfigError::Io { path, source })
+        write_json(self.config_path(&manifest.id), &Value::Object(out), false)
     }
+
+    pub fn save_secrets(
+        &self,
+        manifest: &Manifest,
+        values: &Map<String, Value>,
+    ) -> Result<(), ConfigError> {
+        let mut out = Map::new();
+        for field in manifest.config.iter().filter(|f| f.secret) {
+            if let Some(Value::String(value)) = values.get(&field.key) {
+                out.insert(field.key.clone(), Value::String(value.clone()));
+            }
+        }
+
+        write_json(self.secrets_path(&manifest.id), &Value::Object(out), true)
+    }
+}
+
+fn read_object(path: PathBuf) -> Result<Map<String, Value>, ConfigError> {
+    match fs::read_to_string(&path) {
+        Ok(raw) => match serde_json::from_str::<Value>(&raw) {
+            Ok(Value::Object(map)) => Ok(map),
+            Ok(_) => Err(ConfigError::NotAnObject { path }),
+            Err(source) => Err(ConfigError::Parse { path, source }),
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Map::new()),
+        Err(source) => Err(ConfigError::Io { path, source }),
+    }
+}
+
+fn write_json(path: PathBuf, value: &Value, private: bool) -> Result<(), ConfigError> {
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent)?;
+        if private {
+            restrict(parent, 0o700)?;
+        }
+    }
+
+    let body = serde_json::to_string_pretty(value).expect("map serialises");
+    fs::write(&path, body).map_err(|source| ConfigError::Io {
+        path: path.clone(),
+        source,
+    })?;
+
+    if private {
+        restrict(&path, 0o600)?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn restrict(path: &Path, mode: u32) -> Result<(), ConfigError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|source| ConfigError::Io {
+        path: path.to_owned(),
+        source,
+    })
+}
+
+#[cfg(not(unix))]
+fn restrict(_path: &Path, _mode: u32) -> Result<(), ConfigError> {
+    Ok(())
 }
 
 fn create_dir_all(dir: &Path) -> Result<(), ConfigError> {
@@ -124,6 +181,17 @@ impl PluginConfig {
             .filter(|(k, _)| !self.secrets.iter().any(|s| s == *k))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
+    }
+
+    pub fn host_values(&self) -> Map<String, Value> {
+        let mut out = Map::new();
+        for (key, value) in &self.values {
+            out.insert(key.clone(), value.clone());
+        }
+        for key in &self.secrets {
+            out.insert(key.clone(), Value::String(format!("{{{{{key}}}}}")));
+        }
+        out
     }
 
     pub fn secret_keys(&self) -> &[String] {
@@ -183,7 +251,7 @@ fn matches(kind: ConfigType, value: &Value) -> bool {
     }
 }
 
-fn kind_of(value: &Value) -> &'static str {
+pub(crate) fn kind_of(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "boolean",
@@ -252,7 +320,7 @@ mod tests {
             )
             .unwrap();
 
-        let on_disk = fs::read_to_string(store.path_for("stockprice")).unwrap();
+        let on_disk = fs::read_to_string(store.config_path("stockprice")).unwrap();
         assert!(!on_disk.contains("hunter2"), "secret written to disk");
         assert!(!on_disk.contains("token"), "secret key written to disk");
 
@@ -269,8 +337,8 @@ mod tests {
     fn wrong_type_falls_back_to_default_and_warns() {
         let store = store("badtype");
         let manifest = manifest();
-        fs::create_dir_all(store.path_for("x").parent().unwrap()).unwrap();
-        fs::write(store.path_for("stockprice"), r#"{"count":"ten"}"#).unwrap();
+        fs::create_dir_all(store.dir_for("stockprice")).unwrap();
+        fs::write(store.config_path("stockprice"), r#"{"count":"ten"}"#).unwrap();
 
         let config = store.load(&manifest).unwrap();
         assert_eq!(config.host_value("count"), Some(json!(10)));
@@ -279,11 +347,91 @@ mod tests {
     }
 
     #[test]
+    fn secrets_round_trip_through_their_own_file() {
+        let store = store("secretfile");
+        let manifest = manifest();
+        store
+            .save(&manifest, json!({ "ticker": "MSFT" }).as_object().unwrap())
+            .unwrap();
+        store
+            .save_secrets(&manifest, json!({ "token": "hunter2" }).as_object().unwrap())
+            .unwrap();
+
+        let config_file = fs::read_to_string(store.config_path("stockprice")).unwrap();
+        assert!(!config_file.contains("token"), "secret key in config.json");
+        assert!(!config_file.contains("hunter2"), "secret value in config.json");
+
+        let secrets_file = fs::read_to_string(store.secrets_path("stockprice")).unwrap();
+        assert!(secrets_file.contains("hunter2"));
+        assert!(!secrets_file.contains("ticker"));
+
+        let secrets = store.load_secrets(&manifest).unwrap();
+        assert_eq!(secrets.get("token"), Some("hunter2"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn secrets_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let store = store("secretperms");
+        let manifest = manifest();
+        store
+            .save_secrets(&manifest, json!({ "token": "hunter2" }).as_object().unwrap())
+            .unwrap();
+
+        let mode = fs::metadata(store.secrets_path("stockprice"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "secrets.json is group/world readable");
+    }
+
+    #[test]
+    fn undeclared_secrets_are_rejected() {
+        let store = store("secretstray");
+        let manifest = manifest();
+        fs::create_dir_all(store.dir_for("stockprice")).unwrap();
+        fs::write(
+            store.secrets_path("stockprice"),
+            r#"{"ticker":"MSFT","nope":"x"}"#,
+        )
+        .unwrap();
+
+        let secrets = store.load_secrets(&manifest).unwrap();
+        assert!(secrets.get("ticker").is_none());
+        assert!(secrets.get("nope").is_none());
+        assert_eq!(secrets.warnings.len(), 3);
+    }
+
+    #[test]
+    fn host_values_shows_placeholders_for_secrets() {
+        let config = store("hostvalues").load(&manifest()).unwrap();
+        let values = config.host_values();
+
+        assert_eq!(values.get("ticker"), Some(&json!("AAPL")));
+        assert_eq!(values.get("token"), Some(&json!("{{token}}")));
+    }
+
+    #[test]
+    fn secrets_debug_does_not_leak_values() {
+        let store = store("secretdebug");
+        let manifest = manifest();
+        store
+            .save_secrets(&manifest, json!({ "token": "hunter2" }).as_object().unwrap())
+            .unwrap();
+
+        let rendered = format!("{:?}", store.load_secrets(&manifest).unwrap());
+        assert!(!rendered.contains("hunter2"), "{rendered}");
+        assert!(rendered.contains("token"));
+    }
+
+    #[test]
     fn undeclared_keys_are_dropped_with_a_warning() {
         let store = store("stale");
         let manifest = manifest();
-        fs::create_dir_all(store.path_for("x").parent().unwrap()).unwrap();
-        fs::write(store.path_for("stockprice"), r#"{"removed_setting":1}"#).unwrap();
+        fs::create_dir_all(store.dir_for("stockprice")).unwrap();
+        fs::write(store.config_path("stockprice"), r#"{"removed_setting":1}"#).unwrap();
 
         let config = store.load(&manifest).unwrap();
         assert!(config.host_value("removed_setting").is_none());

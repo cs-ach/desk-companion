@@ -1,5 +1,6 @@
 use std::{fs, sync::Arc, thread::JoinHandle, time::Duration};
 
+use chrono::{Local, TimeDelta};
 use plugin::Plugin;
 use rquickjs::{
     AsyncContext, AsyncRuntime, CatchResultExt, Ctx, Function, Result as JsResult, Value,
@@ -7,6 +8,7 @@ use rquickjs::{
 };
 
 use crate::error::{Error, Result};
+use crate::logger::Logger;
 
 pub struct RustFunction {
     pub name: &'static str,
@@ -97,10 +99,10 @@ impl Sandbox {
             .await
     }
 
-    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>,) -> JoinHandle<()> {
+    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>,) -> JoinHandle<()> {
         std::thread::spawn(move || {
-            let id = plugin.manifest.id.clone();
             let mut tick_interval = DEFAULT_TICK_INTERVAL;
+            let mut last_retry_at = Local::now();
 
             if let Some(plugin_interval) = plugin.manifest.tick_interval_ms {
                 tick_interval = Duration::from_millis(plugin_interval.into());
@@ -110,7 +112,7 @@ impl Sandbox {
             let tokio_rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(rt) => rt,
                 Err(e) => {
-                    eprintln!("[{id}] could not start async runtime: {e}");
+                    logger.error(&format!("could not start async runtime: {e}"));
                     return;
                 }
             };
@@ -121,17 +123,17 @@ impl Sandbox {
 
 
                 if let Err(e) = sandbox.build().await {
-                    eprintln!("[{id}] build failed: {e}");
+                    logger.error(&format!("build failed: {e}"));
                     return;
                 }
 
                 if let Err(e) = sandbox.load_host().await {
-                    eprintln!("[{id}] host.js failed: {e}");
+                    logger.error(&format!("host.js failed: {e}"));
                     return;
                 }
 
                 if let Err(e) = sandbox.call_global("init", ()).await {
-                    eprintln!("[{id}] init failed: {e}");
+                    logger.error(&format!("init failed: {e}"));
                     return;
                 }
 
@@ -142,16 +144,20 @@ impl Sandbox {
                     match sandbox.call_global("tick", ()).await {
                         Ok(true) => {},
                         Ok(false) => {
-                            println!("[{id}] Tick not defined!"); 
+                            logger.warn("tick not defined");
                             break;
                         },
                         Err(e) => {
                             retry += 1;
-                            if retry > MAX_RETRY_ATTEMPTS {
-                                eprintln!("[{id}] Max amount of retries reached: {e}");
-                                break;
+                            if (Local::now() - last_retry_at) <= TimeDelta::minutes(5) {
+                                if retry > MAX_RETRY_ATTEMPTS {
+                                    logger.error(&format!("max retries reached: {e}"));
+                                    break;
+                                }
                             }
-                            eprintln!("[{id}] Tick failed! {e} | Retrying.. {retry} out of {MAX_RETRY_ATTEMPTS} attempts.");
+
+                            logger.warn(&format!("tick failed: {e} (attempt {retry} of {MAX_RETRY_ATTEMPTS})"));
+                            interval.reset();
                         }
 
                     }

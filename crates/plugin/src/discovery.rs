@@ -1,15 +1,25 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::config::PluginConfig;
 use crate::manifest::Manifest;
+use crate::secrets::Secrets;
 
 #[derive(Debug, Clone)]
 pub struct Plugin {
     pub manifest: Manifest,
     pub root: PathBuf,
+    pub config: PluginConfig,
+    pub secrets: Secrets,
 }
 
 impl Plugin {
+    pub fn with_settings(mut self, config: PluginConfig, secrets: Secrets) -> Self {
+        self.config = config;
+        self.secrets = secrets;
+        self
+    }
+
     pub fn pi_js(&self) -> PathBuf {
         self.root.join("pi.js")
     }
@@ -166,6 +176,8 @@ fn load(root: &Path) -> Result<Plugin, DiscoveryError> {
     Ok(Plugin {
         manifest,
         root: root.to_owned(),
+        config: PluginConfig::default(),
+        secrets: Secrets::default(),
     })
 }
 
