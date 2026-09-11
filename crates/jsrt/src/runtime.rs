@@ -1,4 +1,4 @@
-use std::{fs, sync::Arc, thread::{JoinHandle, sleep}, time::Duration};
+use std::{fs, sync::Arc, thread::{JoinHandle}};
 
 use plugin::Plugin;
 use rquickjs::{AsyncContext, AsyncRuntime, Ctx, Result, Value};
@@ -17,6 +17,7 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
+
     pub fn new(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<HostFunction>) -> Self {
         Self { plugin, memory_limit, functions, runtime: None, context: None }
     }
@@ -24,7 +25,7 @@ impl Sandbox {
     pub async fn build(&mut self) -> Result<()> {
         let runtime = AsyncRuntime::new()?;
         runtime.set_memory_limit(self.memory_limit).await;
-
+    
         let context = AsyncContext::full(&runtime).await?;
 
         context.async_with(async |ctx| {
@@ -51,7 +52,7 @@ impl Sandbox {
         let context = self.context.as_ref().ok_or(rquickjs::Error::Unknown)?;
         context.async_with(async |ctx| {
             ctx.eval::<(), _>(content)?;
-            ctx.eval::<(), _>("setTimeout(main, 1000);")?;
+            ctx.eval::<(), _>("main();")?;
             Ok::<(), rquickjs::Error>(())
         }).await?;
 
@@ -80,8 +81,21 @@ impl Sandbox {
 
                 if let Err(e) = sandbox.start_host().await {
                     eprintln!("[{id}] host.js failed: {e}");
+                    return;
                 }
+
+                sandbox.run_until_idle().await;
+
             });
         })
     }
+
+    async fn run_until_idle(&self) {
+        if let Some(runtime) = &self.runtime {
+            runtime.idle().await
+        }else{
+            return
+        }
+    }
+
 }

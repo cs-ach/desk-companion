@@ -1,3 +1,5 @@
+mod desk;
+mod http;
 mod sync;
 
 use std::path::PathBuf;
@@ -6,13 +8,6 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use jsrt::{HostFunction, Sandbox};
 use plugin::ConfigStore;
-
-
-#[path = "js/host_functions.rs"]
-mod host_functions;
-
-#[path = "utils/http.rs"]
-mod http;
 
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 
@@ -54,10 +49,22 @@ fn main() -> Result<()> {
 
     let mut handles = Vec::new();
     for p in &plugins {
-        let functions = vec![HostFunction {
-            name: "log",
-            build: Box::new(host_functions::log),
-        }];
+
+        let client = http::HttpClient::new();
+
+        let functions = vec![
+            HostFunction {
+                name: "log",
+                build: Box::new(desk::log),
+            },
+            HostFunction {
+                name: "fetch",
+                build: Box::new(move |ctx, plugin| {
+                    desk::fetch(ctx, plugin, client.clone())
+                }),
+            },
+        ];
+
         handles.push(Sandbox::start_thread(
             Arc::new(p.clone()),
             PLUGIN_MEMORY_LIMIT,

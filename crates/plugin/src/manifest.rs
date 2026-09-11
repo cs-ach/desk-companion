@@ -26,8 +26,8 @@ pub struct Manifest {
     #[serde(default)]
     pub config: Vec<ConfigField>,
 
-    #[serde(default, rename = "tickDeadlineMs")]
-    pub tick_deadline_ms: Option<u32>,
+    #[serde(default, rename = "tickIntervalMs")]
+    pub tick_interval_ms: Option<u32>,
 
     #[serde(default)]
     pub memory_limit_mb: Option<u32>,
