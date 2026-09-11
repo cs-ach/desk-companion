@@ -36,6 +36,14 @@ impl Logger {
         }
     }
 
+    pub fn info(&self, message: &str){
+        self.log("info", message);
+    }
+
+    pub fn debug(&self, message: &str){
+        self.log("debug", message);
+    }
+
     pub fn error(&self, message: &str) {
         self.log("error", message);
     }
