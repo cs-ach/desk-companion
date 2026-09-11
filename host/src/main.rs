@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use jsrt::{HostFunction, Sandbox};
+use jsrt::{RustFunction, Sandbox};
 use plugin::ConfigStore;
 
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
@@ -53,11 +53,11 @@ fn main() -> Result<()> {
         let client = http::HttpClient::new();
 
         let functions = vec![
-            HostFunction {
+            RustFunction {
                 name: "log",
                 build: Box::new(desk::log),
             },
-            HostFunction {
+            RustFunction {
                 name: "fetch",
                 build: Box::new(move |ctx, plugin| {
                     desk::fetch(ctx, plugin, client.clone())

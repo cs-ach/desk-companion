@@ -1,25 +1,34 @@
-use std::{fs, sync::Arc, thread::{JoinHandle}};
+use std::{fs, sync::Arc, thread::JoinHandle, time::Duration};
 
 use plugin::Plugin;
-use rquickjs::{AsyncContext, AsyncRuntime, Ctx, Result, Value};
+use rquickjs::{
+    AsyncContext, AsyncRuntime, CatchResultExt, Ctx, Function, Result as JsResult, Value,
+    function::IntoArgs, promise::MaybePromise,
+};
 
-pub struct HostFunction {
+use crate::error::{Error, Result};
+
+pub struct RustFunction {
     pub name: &'static str,
-    pub build: Box<dyn for<'js> Fn(&Ctx<'js>, &Plugin) -> Result<Value<'js>> + Send>,
+    pub build: Box<dyn for<'js> Fn(&Ctx<'js>, &Plugin) -> JsResult<Value<'js>> + Send>,
 }
+
+const DEFAULT_TICK_INTERVAL: Duration = Duration::from_secs(30);
+const MIN_TICK_INTERVAL: Duration = Duration::from_secs(1);
+const MAX_RETRY_ATTEMPTS: u16 = 5;
 
 pub struct Sandbox {
     plugin: Arc<Plugin>,
     memory_limit: usize,
-    functions: Vec<HostFunction>,
+    functions: Vec<RustFunction>,
     runtime: Option<AsyncRuntime>,
     context: Option<AsyncContext>,
 }
 
 impl Sandbox {
 
-    pub fn new(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<HostFunction>) -> Self {
-        Self { plugin, memory_limit, functions, runtime: None, context: None }
+    pub fn new(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>) -> Self {
+        Self { plugin, memory_limit, functions, runtime: None, context: None}
     }
 
     pub async fn build(&mut self) -> Result<()> {
@@ -43,25 +52,60 @@ impl Sandbox {
         Ok(())
     }
 
-    async fn start_host(&self) -> Result<()> {
+    async fn load_host(&self) -> Result<()> {
         let Some(host_js) = self.plugin.host_js() else {
             return Ok(());
         };
 
-        let content = fs::read(host_js)?;
-        let context = self.context.as_ref().ok_or(rquickjs::Error::Unknown)?;
-        context.async_with(async |ctx| {
-            ctx.eval::<(), _>(content)?;
-            ctx.eval::<(), _>("main();")?;
-            Ok::<(), rquickjs::Error>(())
-        }).await?;
+        let content = fs::read(&host_js).map_err(|source| Error::Io {
+            path: host_js,
+            source,
+        })?;
 
-        Ok(())
+        let context = self.context.as_ref().ok_or(rquickjs::Error::Unknown)?;
+        context
+            .async_with(async move |ctx| {
+                ctx.eval::<(), _>(content)
+                    .catch(&ctx)
+                    .map_err(Error::from_caught)
+            })
+            .await
     }
 
-    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<HostFunction>,) -> JoinHandle<()> {
+    async fn call_global<A>(&self, name: &str, args: A) -> Result<bool>
+    where
+        A: for<'js> IntoArgs<'js>,
+    {
+        let context = self.context.as_ref().ok_or(rquickjs::Error::Unknown)?;
+        context
+            .async_with(async move |ctx| {
+                let outcome = async {
+                    let Some(func) = ctx.globals().get::<_, Option<Function>>(name)? else {
+                        return Ok(false);
+                    };
+
+                    func.call::<_, MaybePromise>(args)?
+                        .into_future::<()>()
+                        .await?;
+
+                    Ok::<bool, rquickjs::Error>(true)
+                }
+                .await;
+
+                outcome.catch(&ctx).map_err(Error::from_caught)
+            })
+            .await
+    }
+
+    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>,) -> JoinHandle<()> {
         std::thread::spawn(move || {
             let id = plugin.manifest.id.clone();
+            let mut tick_interval = DEFAULT_TICK_INTERVAL;
+
+            if let Some(plugin_interval) = plugin.manifest.tick_interval_ms {
+                tick_interval = Duration::from_millis(plugin_interval.into());
+            }
+            
 
             let tokio_rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(rt) => rt,
@@ -73,19 +117,48 @@ impl Sandbox {
 
             tokio_rt.block_on(async move {
                 let mut sandbox = Sandbox::new(plugin, memory_limit, functions);
+                let mut interval = tokio::time::interval(tick_interval.max(MIN_TICK_INTERVAL));
+
 
                 if let Err(e) = sandbox.build().await {
                     eprintln!("[{id}] build failed: {e}");
                     return;
                 }
 
-                if let Err(e) = sandbox.start_host().await {
+                if let Err(e) = sandbox.load_host().await {
                     eprintln!("[{id}] host.js failed: {e}");
                     return;
                 }
 
-                sandbox.run_until_idle().await;
+                if let Err(e) = sandbox.call_global("init", ()).await {
+                    eprintln!("[{id}] init failed: {e}");
+                    return;
+                }
 
+                let mut retry = 0;
+
+                loop {
+                    interval.tick().await;
+                    match sandbox.call_global("tick", ()).await {
+                        Ok(true) => {},
+                        Ok(false) => {
+                            println!("[{id}] Tick not defined!"); 
+                            break;
+                        },
+                        Err(e) => {
+                            retry += 1;
+                            if retry > MAX_RETRY_ATTEMPTS {
+                                eprintln!("[{id}] Max amount of retries reached: {e}");
+                                break;
+                            }
+                            eprintln!("[{id}] Tick failed! {e} | Retrying.. {retry} out of {MAX_RETRY_ATTEMPTS} attempts.");
+                        }
+
+                    }
+                    interval.reset();
+                }
+
+                sandbox.run_until_idle().await;
             });
         })
     }

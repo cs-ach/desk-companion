@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use jsrt::rquickjs::{self, Ctx, Exception, Function, IntoJs, Object, Value, function::{Async, Opt}};
 use plugin::Plugin;
@@ -16,7 +17,8 @@ pub fn fetch<'js>(ctx: &Ctx<'js>, _plugin: &Plugin, http_client: HttpClient) -> 
             let response = client
                 .fetch(url, options)
                 .await
-                .map_err(|e| Exception::throw_message(&ctx, &e.to_string()))?;
+                .map_err(|e| Exception::throw_message(&ctx, &describe(&e)))?;
+
             Ok::<_, rquickjs::Error>(response)
         }
     }))?;
@@ -42,6 +44,16 @@ fn parse_options<'js>(ctx: &Ctx<'js>, options: Opt<Object<'js>>) -> rquickjs::Re
         .ok_or_else(|| Exception::throw_message(ctx, &format!("unsupported fetch method: {method_name}")))?;
 
     Ok(FetchOptions { method, headers, body })
+}
+
+fn describe(error: &dyn std::error::Error) -> String {
+    let mut out = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        let _ = write!(out, ": {cause}");
+        source = cause.source();
+    }
+    out
 }
 
 impl<'js> IntoJs<'js> for HttpResponse {

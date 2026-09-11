@@ -1,0 +1,40 @@
+// 2x2 widget: the most recent qualifying quake, as declared in manifest.json.
+
+export component Latest inherits Rectangle {
+    in property <string> magnitude: "—";
+    in property <string> place: "no data";
+    in property <string> ago: "";
+
+    background: #171c21;
+    border-radius: 12px;
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 4px;
+
+        Text {
+            text: root.magnitude;
+            font-size: 30px;
+            font-weight: 700;
+            color: #f2f5f7;
+        }
+
+        Text {
+            text: root.place;
+            font-size: 13px;
+            color: #b3bcc4;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+        }
+
+        Text {
+            text: root.ago;
+            font-size: 11px;
+            color: #7d8792;
+        }
+    }
+}

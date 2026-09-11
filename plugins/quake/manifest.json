@@ -1,0 +1,12 @@
+{
+  "id": "quake",
+  "name": "Earthquake Watch",
+  "requiresHost": true,
+  "tickIntervalMs": 60000,
+  "widgets": [
+    { "name": "latest", "size": "2x2" }
+  ],
+  "capabilities": {
+    "http": ["earthquake.usgs.gov"]
+  }
+}

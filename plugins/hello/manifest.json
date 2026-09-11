@@ -1,5 +1,6 @@
 {
   "id": "hello",
   "name": "Hello",
+  "tickIntervalMs": 1000,
   "requiresHost": true
 }

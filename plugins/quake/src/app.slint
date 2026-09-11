@@ -1,0 +1,52 @@
+// Full-page view for the Earthquake Watch plugin.
+//
+// Nothing compiles this yet -- the device-side Slint runtime is not wired up --
+// but discovery requires src/app.slint and sync.rs ships it to the device, so it
+// is written as the real thing rather than a placeholder.
+
+export component App inherits Window {
+    in property <string> headline: "No data yet";
+    in property <string> subtitle: "waiting for the first tick";
+    in property <string> status: "starting up";
+    in property <int> tracked: 0;
+
+    width: 480px;
+    height: 320px;
+    background: #101418;
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 10px;
+
+        Text {
+            text: "Earthquake Watch";
+            font-size: 14px;
+            color: #7d8792;
+        }
+
+        Text {
+            text: root.headline;
+            font-size: 34px;
+            font-weight: 700;
+            color: #f2f5f7;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: root.subtitle;
+            font-size: 16px;
+            color: #b3bcc4;
+            wrap: word-wrap;
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+        }
+
+        Text {
+            text: "\{root.tracked} tracked · \{root.status}";
+            font-size: 12px;
+            color: #7d8792;
+        }
+    }
+}

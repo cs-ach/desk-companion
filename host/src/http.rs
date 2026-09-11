@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 use reqwest::{Method, header::{HeaderMap, HeaderName, HeaderValue}};
 
 pub struct HttpResponse {
@@ -31,12 +31,13 @@ impl HttpClient {
         let header_map = self.header_to_map(options.headers.unwrap_or_default());
 
         let mut req = self.client.request(options.method, url)
+            .timeout(Duration::from_secs(10))
             .headers(header_map);
 
         if let Some(b) = options.body { req = req.body(b) }
 
         let resp = req.send().await?;
-
+    
         Ok(HttpResponse {
             status_code: resp.status().as_u16(),
             headers: self.map_to_header(resp.headers()),
