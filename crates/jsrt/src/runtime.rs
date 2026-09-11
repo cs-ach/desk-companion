@@ -1,6 +1,5 @@
 use std::{fs, sync::Arc, thread::JoinHandle, time::Duration};
 
-use chrono::{Local, TimeDelta};
 use plugin::Plugin;
 use rquickjs::{
     AsyncContext, AsyncRuntime, CatchResultExt, Ctx, Function, Result as JsResult, Value,
@@ -17,7 +16,6 @@ pub struct RustFunction {
 
 const DEFAULT_TICK_INTERVAL: Duration = Duration::from_secs(30);
 const MIN_TICK_INTERVAL: Duration = Duration::from_secs(1);
-const KILL_AFTER_MINUTES: TimeDelta = TimeDelta::minutes(5);
 const MAX_RETRY_ATTEMPTS: u16 = 5;
 
 pub struct Sandbox {
@@ -103,7 +101,6 @@ impl Sandbox {
     pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>,) -> JoinHandle<()> {
         std::thread::spawn(move || {
             let mut tick_interval = DEFAULT_TICK_INTERVAL;
-            let mut last_retry_at = Local::now();
 
             if let Some(plugin_interval) = plugin.manifest.tick_interval_ms {
                 tick_interval = Duration::from_millis(plugin_interval.into());
@@ -143,23 +140,19 @@ impl Sandbox {
                 loop {
                     interval.tick().await;
                     match sandbox.call_global("tick", ()).await {
-                        Ok(true) => {},
+                        Ok(true) => retry = 0,
                         Ok(false) => {
                             logger.warn("tick not defined");
                             break;
                         },
                         Err(e) => {
                             retry += 1;
-                            if (Local::now() - last_retry_at) <= KILL_AFTER_MINUTES {
-                                if retry > MAX_RETRY_ATTEMPTS {
-                                    logger.error(&format!("max retries reached: {e}"));
-                                    break;
-                                }
-                            }else{
-                                retry = 0;
+
+                            if retry >= MAX_RETRY_ATTEMPTS {
+                                logger.error(&format!("tick failed after {retry} restart attempts! | {e} | Stopping..."));
+                                break;
                             }
 
-                            last_retry_at = Local::now();
                             logger.warn(&format!("tick failed: {e} (attempt {retry} of {MAX_RETRY_ATTEMPTS})"));
                             interval.reset();
                         }
@@ -169,6 +162,7 @@ impl Sandbox {
                 }
 
                 sandbox.run_until_idle().await;
+                logger.warn("Plugin stopped.");
             });
         })
     }
