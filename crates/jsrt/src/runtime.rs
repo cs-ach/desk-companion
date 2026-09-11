@@ -17,6 +17,7 @@ pub struct RustFunction {
 
 const DEFAULT_TICK_INTERVAL: Duration = Duration::from_secs(30);
 const MIN_TICK_INTERVAL: Duration = Duration::from_secs(1);
+const KILL_AFTER_MINUTES: TimeDelta = TimeDelta::minutes(5);
 const MAX_RETRY_ATTEMPTS: u16 = 5;
 
 pub struct Sandbox {
@@ -149,13 +150,16 @@ impl Sandbox {
                         },
                         Err(e) => {
                             retry += 1;
-                            if (Local::now() - last_retry_at) <= TimeDelta::minutes(5) {
+                            if (Local::now() - last_retry_at) <= KILL_AFTER_MINUTES {
                                 if retry > MAX_RETRY_ATTEMPTS {
                                     logger.error(&format!("max retries reached: {e}"));
                                     break;
                                 }
+                            }else{
+                                retry = 0;
                             }
 
+                            last_retry_at = Local::now();
                             logger.warn(&format!("tick failed: {e} (attempt {retry} of {MAX_RETRY_ATTEMPTS})"));
                             interval.reset();
                         }
