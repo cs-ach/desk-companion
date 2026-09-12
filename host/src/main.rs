@@ -1,18 +1,18 @@
 mod desk;
 mod http;
-mod sync;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use jsrt::{Logger, RustFunction, Sandbox, globals};
-use plugin::ConfigStore;
+use plugin::{ConfigStore, device_manifest};
 
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 
 fn main() -> Result<()> {
     let dir = plugins_dir()?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
     let (plugins, errors) =
         plugin::discover(&dir).with_context(|| format!("scanning {}", dir.display()))?;
 
@@ -55,15 +55,14 @@ fn main() -> Result<()> {
     }
     let plugins = loaded;
 
-    let files = sync::device_manifest(&plugins)?;
+    let files = device_manifest(&plugins)?;
     println!("\n{} file(s) to keep in sync with the device\n", files.len());
 
     let mut handles = Vec::new();
     for p in &plugins {
 
         let client = http::HttpClient::new();
-        let logs_dir = store.dir_for(&p.manifest.id).join("logs");
-        let logger = Arc::new(Logger::new(&p.manifest.id, &logs_dir));
+        let logger = Arc::new(Logger::new(&p.manifest.id, &p.logs_dir()));
 
         let functions = vec![
             RustFunction {
@@ -108,9 +107,5 @@ fn plugins_dir() -> Result<PathBuf> {
     if let Some(arg) = std::env::args().nth(1) {
         return Ok(PathBuf::from(arg));
     }
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .context("workspace root")?
-        .join("plugins");
-    Ok(root)
+    plugin::user_plugins_dir().context("no application data directory on this platform")
 }

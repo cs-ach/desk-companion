@@ -24,6 +24,10 @@ impl Plugin {
         self.root.join("pi.js")
     }
 
+    pub fn logs_dir(&self) -> PathBuf {
+        self.root.join("logs")
+    }
+
     pub fn host_js(&self) -> Option<PathBuf> {
         self.manifest
             .requires_host

@@ -2,9 +2,10 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use plugin::Plugin;
 use protocol::FileEntry;
 use sha2::{Digest, Sha256};
+
+use crate::Plugin;
 
 const DEVICE_DIRS: &[&str] = &["src", "widgets", "public"];
 
@@ -27,6 +28,7 @@ pub fn device_manifest(plugins: &[Plugin]) -> Result<Vec<FileEntry>> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
 }
+
 
 fn push_dir(out: &mut Vec<FileEntry>, root: &Path, dir: &Path, id: &str) -> Result<()> {
     for entry in fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {

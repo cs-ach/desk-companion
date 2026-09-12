@@ -3,10 +3,10 @@ mod link;
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    let dir = std::env::args()
-        .nth(1)
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::PathBuf::from("/var/lib/desk-companion/plugins"));
+    let dir = match std::env::args().nth(1) {
+        Some(arg) => std::path::PathBuf::from(arg),
+        None => plugin::user_plugins_dir().context("no application data directory")?,
+    };
 
     let (plugins, errors) = match plugin::discover(&dir) {
         Ok(found) => found,

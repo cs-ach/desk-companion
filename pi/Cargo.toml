@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 protocol.workspace = true
 plugin.workspace = true
+jsrt.workspace = true
 
 anyhow.workspace = true
 serde.workspace = true
