@@ -15,7 +15,6 @@ use serialport::{ClearBuffer, SerialPort};
 use crate::Host;
 
 pub const GADGET_SERIAL: &str = "/dev/ttyACM0";
-pub const BAUD_RATE: u32 = 9600;
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const NOT_ALIVE_LIMIT: Duration = Duration::from_secs(30);
@@ -29,7 +28,7 @@ pub struct Session<'a> {
 
 impl<'a> Session<'a> {
     fn open(host: &'a mut Host) -> Result<Self> {
-        let port = serialport::new(GADGET_SERIAL, BAUD_RATE)
+        let port = serialport::new(GADGET_SERIAL, protocol::BAUD_RATE)
             .timeout(READ_TIMEOUT)
             .open()
             .with_context(|| format!("opening {GADGET_SERIAL}"))?;

@@ -15,7 +15,6 @@ use serialport::{ClearBuffer, SerialPort};
 use crate::Pi;
 
 pub const GADGET_SERIAL: &str = "/dev/ttyGS0";
-pub const BAUD_RATE: u32 = 9600;
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const ANNOUNCE_INTERVAL: Duration = Duration::from_secs(10);
@@ -43,7 +42,7 @@ struct Session<'a> {
 
 impl<'a> Session<'a> {
     fn open(pi: &'a mut Pi) -> Result<Self> {
-        let port = serialport::new(GADGET_SERIAL, BAUD_RATE)
+        let port = serialport::new(GADGET_SERIAL, protocol::BAUD_RATE)
             .timeout(READ_TIMEOUT)
             .open()
             .with_context(|| format!("opening {GADGET_SERIAL}"))?;
