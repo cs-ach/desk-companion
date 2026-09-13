@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{fs, sync::Arc, thread::JoinHandle, time::Duration};
 
 use plugin::Plugin;
@@ -9,6 +10,28 @@ use rquickjs::{
 use crate::error::{Error, Result};
 use crate::logger::Logger;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Entry {
+    Host,
+    Pi,
+}
+
+impl Entry {
+    fn script(&self, plugin: &Plugin) -> Option<std::path::PathBuf> {
+        match self {
+            Entry::Host => plugin.host_js(),
+            Entry::Pi => Some(plugin.pi_js()),
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Entry::Host => "host.js",
+            Entry::Pi => "pi.js",
+        }
+    }
+}
+
 pub struct RustFunction {
     pub name: &'static str,
     pub build: Box<dyn for<'js> Fn(&Ctx<'js>, &Plugin) -> JsResult<Value<'js>> + Send>,
@@ -19,22 +42,30 @@ const MIN_TICK_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_RETRY_ATTEMPTS: u16 = 5;
 
 pub struct Sandbox {
-    plugin: Arc<Plugin>,
-    memory_limit: usize,
-    functions: Vec<RustFunction>,
+    pub plugin: Arc<Plugin>,
+    pub memory_limit: usize,
+    pub logger: Arc<Logger>,
+    pub functions: Vec<RustFunction>,
+    pub entry: Entry,
     runtime: Option<AsyncRuntime>,
     context: Option<AsyncContext>,
+    pub shutdown_handler: Arc<AtomicBool>,
 }
 
 impl Sandbox {
 
-    pub fn new(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>) -> Self {
-        Self { plugin, memory_limit, functions, runtime: None, context: None}
+    pub fn new(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>, shutdown_handler: Arc<AtomicBool>, entry: Entry) -> Self {
+        Self { plugin, memory_limit, functions, runtime: None, context: None, logger, shutdown_handler, entry }
     }
 
     pub async fn build(&mut self) -> Result<()> {
         let runtime = AsyncRuntime::new()?;
+        let shutdown_trigger = self.shutdown_handler.clone();
+
         runtime.set_memory_limit(self.memory_limit).await;
+        runtime.set_interrupt_handler(Some(Box::new(move || {
+            shutdown_trigger.load(Ordering::Relaxed)
+        }))).await;
     
         let context = AsyncContext::full(&runtime).await?;
 
@@ -53,13 +84,13 @@ impl Sandbox {
         Ok(())
     }
 
-    async fn load_host(&self) -> Result<()> {
-        let Some(host_js) = self.plugin.host_js() else {
+    async fn load_entry(&self) -> Result<()> {
+        let Some(script) = self.entry.script(&self.plugin) else {
             return Ok(());
         };
 
-        let content = fs::read(&host_js).map_err(|source| Error::Io {
-            path: host_js,
+        let content = fs::read(&script).map_err(|source| Error::Io {
+            path: script,
             source,
         })?;
 
@@ -98,7 +129,11 @@ impl Sandbox {
             .await
     }
 
-    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>,) -> JoinHandle<()> {
+    pub fn shutdown(&self) {
+        self.shutdown_handler.store(true, Ordering::Relaxed);
+    }
+
+    pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>, shutdown_handler: Arc<AtomicBool>, entry: Entry) -> JoinHandle<()> {
         std::thread::spawn(move || {
             let mut tick_interval = DEFAULT_TICK_INTERVAL;
 
@@ -116,44 +151,49 @@ impl Sandbox {
             };
 
             tokio_rt.block_on(async move {
-                let mut sandbox = Sandbox::new(plugin, memory_limit, functions);
+                let mut sandbox = Sandbox::new(plugin, memory_limit, functions, logger, shutdown_handler, entry);
                 let mut interval = tokio::time::interval(tick_interval.max(MIN_TICK_INTERVAL));
 
 
                 if let Err(e) = sandbox.build().await {
-                    logger.error(&format!("build failed: {e}"));
+                    sandbox.logger.error(&format!("build failed: {e}"));
                     return;
                 }
 
-                if let Err(e) = sandbox.load_host().await {
-                    logger.error(&format!("host.js failed: {e}"));
+                if let Err(e) = sandbox.load_entry().await {
+                    sandbox.logger.error(&format!("{} failed: {e}", entry.name()));
                     return;
                 }
 
                 if let Err(e) = sandbox.call_global("init", ()).await {
-                    logger.error(&format!("init failed: {e}"));
+                    sandbox.logger.error(&format!("init failed: {e}"));
                     return;
                 }
 
                 let mut retry = 0;
 
                 loop {
+                    if sandbox.shutdown_handler.load(Ordering::Relaxed) {
+                        break;
+                    }
+
                     interval.tick().await;
                     match sandbox.call_global("tick", ()).await {
                         Ok(true) => retry = 0,
                         Ok(false) => {
-                            logger.warn("tick not defined");
+                            sandbox.logger.warn("tick not defined");
                             break;
                         },
                         Err(e) => {
                             retry += 1;
 
                             if retry >= MAX_RETRY_ATTEMPTS {
-                                logger.error(&format!("tick failed after {retry} restart attempts! | {e} | Stopping..."));
+                                sandbox.logger.error(&format!("tick failed after {retry} restart attempts! | {e} | Stopping..."));
                                 break;
                             }
 
-                            logger.warn(&format!("tick failed: {e} (attempt {retry} of {MAX_RETRY_ATTEMPTS})"));
+                            sandbox.logger.warn(&format!("tick failed: {e} (attempt {retry} of {MAX_RETRY_ATTEMPTS})"));
+
                             interval.reset();
                         }
 
@@ -162,7 +202,7 @@ impl Sandbox {
                 }
 
                 sandbox.run_until_idle().await;
-                logger.warn("Plugin stopped.");
+                sandbox.logger.warn("Plugin stopped.");
             });
         })
     }

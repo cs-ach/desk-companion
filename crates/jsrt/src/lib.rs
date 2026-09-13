@@ -9,4 +9,4 @@ pub use rquickjs;
 pub use error::{Error, Result};
 pub use json::Json;
 pub use logger::Logger;
-pub use runtime::{RustFunction, Sandbox};
+pub use runtime::{Entry, RustFunction, Sandbox};

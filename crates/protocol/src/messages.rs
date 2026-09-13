@@ -65,6 +65,8 @@ pub enum PiToHost {
 
     StateRequest,
 
+    Ready,
+
     SyncNeed {
         paths: Vec<String>,
     },

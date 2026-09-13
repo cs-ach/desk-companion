@@ -4,4 +4,10 @@
 // this file just announces itself. Once the link is live this is where incoming
 // `state` messages from the host would be turned into widget properties.
 
-log("info", "quake pi.js loaded");
+async function init() {
+    log("info", "INIT!");
+}
+
+async function tick(){
+    log("INFO", "TICK!");
+}

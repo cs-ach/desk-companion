@@ -39,7 +39,7 @@ impl Plugin {
     }
 
     pub fn widget_slint(&self, name: &str) -> PathBuf {
-        self.root.join("widgets").join(format!("{name}.slint"))
+        self.root.join("src").join("widgets").join(format!("{name}.slint"))
     }
 }
 
@@ -71,6 +71,14 @@ pub enum DiscoveryError {
 }
 
 pub fn discover(dir: &Path) -> Result<(Vec<Plugin>, Vec<DiscoveryError>), DiscoveryError> {
+    scan(dir, true)
+}
+
+pub fn discover_device(dir: &Path) -> Result<(Vec<Plugin>, Vec<DiscoveryError>), DiscoveryError> {
+    scan(dir, false)
+}
+
+fn scan(dir: &Path, expect_host_js: bool) -> Result<(Vec<Plugin>, Vec<DiscoveryError>), DiscoveryError> {
     let entries = fs::read_dir(dir).map_err(|source| DiscoveryError::ReadDir {
         path: dir.to_owned(),
         source,
@@ -92,7 +100,7 @@ pub fn discover(dir: &Path) -> Result<(Vec<Plugin>, Vec<DiscoveryError>), Discov
             }
         };
 
-        match load(&root) {
+        match load(&root, expect_host_js) {
             Ok(plugin) => {
                 let clash = plugins
                     .iter()
@@ -114,7 +122,7 @@ pub fn discover(dir: &Path) -> Result<(Vec<Plugin>, Vec<DiscoveryError>), Discov
     Ok((plugins, errors))
 }
 
-fn load(root: &Path) -> Result<Plugin, DiscoveryError> {
+fn load(root: &Path, expect_host_js: bool) -> Result<Plugin, DiscoveryError> {
     let manifest_path = root.join("manifest.json");
     let raw =
         fs::read_to_string(&manifest_path).map_err(|source| DiscoveryError::ReadManifest {
@@ -158,7 +166,9 @@ fn load(root: &Path) -> Result<Plugin, DiscoveryError> {
 
     let host_js = root.join("host.js").is_file();
     match (manifest.requires_host, host_js) {
-        (true, false) => return Err(invalid("requiresHost is set but host.js is missing".into())),
+        (true, false) if expect_host_js => {
+            return Err(invalid("requiresHost is set but host.js is missing".into()));
+        }
         (false, true) => {
             return Err(invalid(
                 "host.js is present but requiresHost is not set, so it would never run".into(),
@@ -168,10 +178,13 @@ fn load(root: &Path) -> Result<Plugin, DiscoveryError> {
     }
 
     for widget in &manifest.widgets {
-        let markup = root.join("widgets").join(format!("{}.slint", widget.name));
+        let markup = root
+            .join("src")
+            .join("widgets")
+            .join(format!("{}.slint", widget.name));
         if !markup.is_file() {
             return Err(invalid(format!(
-                "widget {:?} is declared but widgets/{}.slint is missing",
+                "widget {:?} is declared but src/widgets/{}.slint is missing",
                 widget.name, widget.name
             )));
         }
@@ -281,8 +294,8 @@ mod tests {
                 "widgets":[{"name":"top","size":"4x2"}]}"#,
         );
         fs::write(root.join("host.js"), "").unwrap();
-        fs::create_dir_all(root.join("widgets")).unwrap();
-        fs::write(root.join("widgets/top.slint"), "").unwrap();
+        fs::create_dir_all(root.join("src/widgets")).unwrap();
+        fs::write(root.join("src/widgets/top.slint"), "").unwrap();
 
         let (plugins, errors) = discover(&dir).unwrap();
         assert!(errors.is_empty(), "{errors:?}");
