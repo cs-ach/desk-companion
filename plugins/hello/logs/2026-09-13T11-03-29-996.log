@@ -1,7 +1,0 @@
-2026-09-13 11:03:30.055 info  init ok
-2026-09-13 11:03:30.056 warn  tick failed: n is not defined (attempt 1 of 5)
-2026-09-13 11:03:31.058 warn  tick failed: n is not defined (attempt 2 of 5)
-2026-09-13 11:03:32.059 warn  tick failed: n is not defined (attempt 3 of 5)
-2026-09-13 11:03:33.060 warn  tick failed: n is not defined (attempt 4 of 5)
-2026-09-13 11:03:34.061 error tick failed after 5 restart attempts! | n is not defined | Stopping...
-2026-09-13 11:03:34.061 warn  Plugin stopped.
