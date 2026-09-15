@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, io};
 use std::path::{Path, PathBuf};
 
 use crate::config::PluginConfig;
@@ -36,6 +36,19 @@ impl Plugin {
 
     pub fn app_slint(&self) -> PathBuf {
         self.root.join("src").join("app.slint")
+    }
+
+    pub fn screens(&self) -> Result<Vec<String>, io::Error> {
+        let files = self.root.join("src").read_dir()?;
+        let mut screens = Vec::new();
+        for f in files.into_iter() {
+            if let Some(file_name) = f?.file_name().to_str() {
+                if file_name.ends_with(".slint") {
+                    screens.push(file_name.to_string());
+                }
+            }
+        }
+        Ok(screens)
     }
 
     pub fn widget_slint(&self, name: &str) -> PathBuf {

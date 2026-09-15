@@ -1,4 +1,5 @@
 mod link;
+mod renderer;
 
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::JoinHandle};
 

@@ -175,6 +175,7 @@ impl<'a> Session<'a> {
                 return;
             }
         };
+        println!("{}", data.to_string());
 
         let starting = seq == 0;
         let continuing = self

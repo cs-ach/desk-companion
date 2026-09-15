@@ -14,3 +14,8 @@ serde.workspace = true
 serde_json.workspace = true
 serialport = { version = "4.10.1", default-features = false }
 base64 = "0.23.1"
+slint-interpreter = "1"
+
+[dev-dependencies]
+slint-interpreter = "1.17"
+spin_on = "0.1"
