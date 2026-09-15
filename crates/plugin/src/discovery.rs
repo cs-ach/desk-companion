@@ -2,6 +2,7 @@ use std::{fs, io};
 use std::path::{Path, PathBuf};
 
 use crate::config::PluginConfig;
+use crate::sync::{DEFAULT_PAGE, PAGES_DIR, PUBLIC_DIR, SRC_DIR, WIDGETS_DIR};
 use crate::manifest::Manifest;
 use crate::secrets::Secrets;
 
@@ -34,25 +35,54 @@ impl Plugin {
             .then(|| self.root.join("host.js"))
     }
 
-    pub fn app_slint(&self) -> PathBuf {
-        self.root.join("src").join("app.slint")
+    pub fn src_dir(&self) -> PathBuf {
+        self.root.join(SRC_DIR)
     }
 
-    pub fn screens(&self) -> Result<Vec<String>, io::Error> {
-        let files = self.root.join("src").read_dir()?;
-        let mut screens = Vec::new();
-        for f in files.into_iter() {
-            if let Some(file_name) = f?.file_name().to_str() {
-                if file_name.ends_with(".slint") {
-                    screens.push(file_name.to_string());
-                }
-            }
-        }
-        Ok(screens)
+    pub fn pages_dir(&self) -> PathBuf {
+        self.src_dir().join(PAGES_DIR)
+    }
+
+    pub fn widgets_dir(&self) -> PathBuf {
+        self.src_dir().join(WIDGETS_DIR)
+    }
+
+    pub fn public_dir(&self) -> PathBuf {
+        self.src_dir().join(PUBLIC_DIR)
+    }
+
+    pub fn app_slint(&self) -> PathBuf {
+        self.page_slint(DEFAULT_PAGE)
+    }
+
+    pub fn page_slint(&self, name: &str) -> PathBuf {
+        self.pages_dir().join(format!("{name}.slint"))
     }
 
     pub fn widget_slint(&self, name: &str) -> PathBuf {
-        self.root.join("src").join("widgets").join(format!("{name}.slint"))
+        self.widgets_dir().join(format!("{name}.slint"))
+    }
+
+    pub fn pages(&self) -> Result<Vec<String>, io::Error> {
+        let mut pages = Vec::new();
+
+        for entry in fs::read_dir(self.pages_dir())? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|e| e == "slint")
+                && let Some(name) = path.file_stem().and_then(|n| n.to_str())
+            {
+                pages.push(name.to_owned());
+            }
+        }
+
+        pages.sort_by(|a, b| match (a.as_str(), b.as_str()) {
+            (DEFAULT_PAGE, DEFAULT_PAGE) => std::cmp::Ordering::Equal,
+            (DEFAULT_PAGE, _) => std::cmp::Ordering::Less,
+            (_, DEFAULT_PAGE) => std::cmp::Ordering::Greater,
+            _ => a.cmp(b),
+        });
+
+        Ok(pages)
     }
 }
 
@@ -168,13 +198,15 @@ fn load(root: &Path, expect_host_js: bool) -> Result<Plugin, DiscoveryError> {
     if !root.join("pi.js").is_file() {
         return Err(invalid("missing required pi.js".into()));
     }
-    if !root.join("src").is_dir() {
-        return Err(invalid("missing required src/".into()));
+    if !root.join(SRC_DIR).is_dir() {
+        return Err(invalid(format!("missing required {SRC_DIR}/")));
     }
-    if !root.join("src/app.slint").is_file() {
-        return Err(invalid(
-            "missing required src/app.slint (the plugin's page)".into(),
-        ));
+
+    let pages = root.join(SRC_DIR).join(PAGES_DIR);
+    if !pages.join(format!("{DEFAULT_PAGE}.slint")).is_file() {
+        return Err(invalid(format!(
+            "missing required {SRC_DIR}/{PAGES_DIR}/{DEFAULT_PAGE}.slint (the plugin's default page)"
+        )));
     }
 
     let host_js = root.join("host.js").is_file();
@@ -192,12 +224,12 @@ fn load(root: &Path, expect_host_js: bool) -> Result<Plugin, DiscoveryError> {
 
     for widget in &manifest.widgets {
         let markup = root
-            .join("src")
-            .join("widgets")
+            .join(SRC_DIR)
+            .join(WIDGETS_DIR)
             .join(format!("{}.slint", widget.name));
         if !markup.is_file() {
             return Err(invalid(format!(
-                "widget {:?} is declared but src/widgets/{}.slint is missing",
+                "widget {:?} is declared but {SRC_DIR}/{WIDGETS_DIR}/{}.slint is missing",
                 widget.name, widget.name
             )));
         }
@@ -217,8 +249,8 @@ mod tests {
 
     fn scaffold(dir: &Path, id: &str, manifest: &str) -> PathBuf {
         let root = dir.join(id);
-        fs::create_dir_all(root.join("src")).unwrap();
-        fs::write(root.join("src/app.slint"), "").unwrap();
+        fs::create_dir_all(root.join("src/pages")).unwrap();
+        fs::write(root.join("src/pages/app.slint"), "").unwrap();
         fs::write(root.join("pi.js"), "").unwrap();
         fs::write(root.join("manifest.json"), manifest).unwrap();
         root
@@ -253,7 +285,7 @@ mod tests {
     fn rejects_a_plugin_without_a_page() {
         let dir = tempdir("rejects_a_plugin_without_a_page");
         let root = scaffold(&dir, "broken", r#"{"id":"broken","name":"B"}"#);
-        fs::remove_file(root.join("src/app.slint")).unwrap();
+        fs::remove_file(root.join("src/pages/app.slint")).unwrap();
 
         let (plugins, errors) = discover(&dir).unwrap();
         assert!(plugins.is_empty());

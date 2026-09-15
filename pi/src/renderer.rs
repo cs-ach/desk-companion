@@ -20,7 +20,7 @@ impl Renderer {
     }
 
     fn get_screen_path(&self, screen: String) {
-
+        
     }
 
 }

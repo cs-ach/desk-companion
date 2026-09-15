@@ -9,7 +9,11 @@ use sha2::{Digest, Sha256};
 
 use crate::Plugin;
 
-const SRC_DIR: &str = "src";
+pub(crate) const SRC_DIR: &str = "src";
+pub(crate) const PAGES_DIR: &str = "pages";
+pub(crate) const WIDGETS_DIR: &str = "widgets";
+pub(crate) const PUBLIC_DIR: &str = "public";
+pub(crate) const DEFAULT_PAGE: &str = "app";
 
 #[derive(Debug, Default, Clone)]
 pub struct FileManifest {
@@ -195,8 +199,8 @@ mod tests {
     fn safe_join_keeps_plain_paths() {
         let root = Path::new("/plugins");
         assert_eq!(
-            safe_join(root, "quake/src/app.slint"),
-            Some(PathBuf::from("/plugins/quake/src/app.slint"))
+            safe_join(root, "quake/src/pages/app.slint"),
+            Some(PathBuf::from("/plugins/quake/src/pages/app.slint"))
         );
     }
 
@@ -213,17 +217,17 @@ mod tests {
 
     #[test]
     fn identical_sides_need_nothing() {
-        let files = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
+        let files = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
         assert!(sync_plan(&files, &files).is_empty());
     }
 
     #[test]
     fn a_missing_file_is_needed() {
-        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
+        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
         let local = vec![entry("quake/pi.js", "aaa")];
 
         let plan = sync_plan(&desired, &local);
-        assert_eq!(plan.needed, ["quake/src/app.slint"]);
+        assert_eq!(plan.needed, ["quake/src/pages/app.slint"]);
         assert!(plan.extra.is_empty());
     }
 
@@ -259,10 +263,10 @@ mod tests {
 
     #[test]
     fn a_bare_device_needs_everything() {
-        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
+        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
 
         let plan = sync_plan(&desired, &[]);
-        assert_eq!(plan.needed, ["quake/pi.js", "quake/src/app.slint"]);
+        assert_eq!(plan.needed, ["quake/pi.js", "quake/src/pages/app.slint"]);
         assert!(plan.extra.is_empty());
     }
 }
