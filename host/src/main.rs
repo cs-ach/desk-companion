@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 
 use anyhow::{Context, Result};
 use jsrt::{Entry, Logger, RustFunction, Sandbox, globals};
@@ -209,9 +209,21 @@ fn settings(store: &ConfigStore, plugin: &Plugin) -> Result<(plugin::PluginConfi
 }
 
 fn main() -> Result<()> {
-    let mut host = Host::load()?;
+    let thread = std::thread::spawn(move || {
+        let mut host = match Host::load() {
+            Ok(host) => host,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                return;
+            }
+        };
+        
+        link::listen(&mut host);
+    });
+
+    let _ = thread.join();
     
-    link::listen(&mut host);
+    Ok(())
 
 }
 
