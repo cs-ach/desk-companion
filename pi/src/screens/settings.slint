@@ -1,0 +1,202 @@
+import { Tokens } from "tokens.slint";
+import { Surface } from "glass.slint";
+
+component Segment inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    callback clicked();
+
+    border-radius: 13px;
+    background: root.selected ? #ffffff29 : transparent;
+
+    Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.label;
+        font-family: Tokens.face;
+        font-size: 13px;
+        font-weight: 600;
+        color: root.selected ? Tokens.text : Tokens.text_2;
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component Swatch inherits Rectangle {
+    in property <string> name;
+    in property <brush> preview;
+    in property <bool> selected;
+    callback clicked();
+
+    border-radius: Tokens.r_nested;
+    border-width: root.selected ? 2px : 1px;
+    background: root.preview;
+    border-color: root.selected ? #ffffffe6 : #ffffff1f;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export struct WallpaperOption {
+    id: string,
+    thumb: image,
+}
+
+export component Settings inherits Rectangle {
+    in property <bool> dock_right;
+    in property <string> background_name;
+    in property <[WallpaperOption]> wallpapers;
+    callback dock_side(bool);
+    callback background_picked(string);
+
+    x: Tokens.content_x;
+    y: Tokens.slot_y;
+    width: Tokens.content_w;
+    height: Tokens.slot_h;
+
+    VerticalLayout {
+        alignment: start;
+        spacing: 0px;
+
+        Text {
+            text: "Appearance";
+            font-family: Tokens.face;
+            font-size: Tokens.caption_size;
+            font-weight: 600;
+            color: #ffffff61;
+        }
+
+        Rectangle { height: 10px; }
+
+        Surface {
+            height: rows.preferred-height;
+            border-radius: Tokens.r_group;
+
+            rows := VerticalLayout {
+                spacing: 0px;
+
+                HorizontalLayout {
+                    height: 56px;
+                    padding-left: 18px;
+                    padding-right: 18px;
+                    spacing: 14px;
+
+                    Text {
+                        text: "Dock position";
+                        font-family: Tokens.face;
+                        font-size: 16px;
+                        font-weight: 500;
+                        color: Tokens.text;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+
+                        Rectangle {
+                            width: 148px;
+                            height: 32px;
+                            border-radius: 16px;
+                            border-width: 1px;
+                            background: #00000040;
+                            border-color: #ffffff17;
+
+                            HorizontalLayout {
+                                padding: 3px;
+                                spacing: 0px;
+
+                                Segment {
+                                    label: "Left";
+                                    selected: !root.dock_right;
+                                    clicked => { root.dock_side(false); }
+                                }
+
+                                Segment {
+                                    label: "Right";
+                                    selected: root.dock_right;
+                                    clicked => { root.dock_side(true); }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: #ffffff12;
+                }
+
+                VerticalLayout {
+                    padding: 18px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "Background";
+                        font-family: Tokens.face;
+                        font-size: 16px;
+                        font-weight: 500;
+                        color: Tokens.text;
+                    }
+
+                    HorizontalLayout {
+                        height: 52px;
+                        spacing: 12px;
+
+                        Swatch {
+                            preview: Tokens.bg_ember;
+                            selected: root.background_name == "ember";
+                            clicked => { root.background_picked("ember"); }
+                        }
+
+                        Swatch {
+                            preview: Tokens.bg_tide;
+                            selected: root.background_name == "tide";
+                            clicked => { root.background_picked("tide"); }
+                        }
+
+                        Swatch {
+                            preview: Tokens.bg_violet;
+                            selected: root.background_name == "violet";
+                            clicked => { root.background_picked("violet"); }
+                        }
+
+                        Swatch {
+                            preview: Tokens.bg_mono;
+                            selected: root.background_name == "mono";
+                            clicked => { root.background_picked("mono"); }
+                        }
+                    }
+
+                    if root.wallpapers.length > 0: HorizontalLayout {
+                        height: 52px;
+                        spacing: 12px;
+                        alignment: start;
+
+                        for w[i] in root.wallpapers: Rectangle {
+                            width: 96px;
+                            border-radius: Tokens.r_nested;
+                            border-width: root.background_name == w.id ? 2px : 1px;
+                            border-color: root.background_name == w.id ? #ffffffe6 : #ffffff1f;
+                            clip: true;
+
+                            Image {
+                                width: 100%;
+                                height: 100%;
+                                image-fit: cover;
+                                source: w.thumb;
+                            }
+
+                            TouchArea {
+                                clicked => { root.background_picked(w.id); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,159 @@
+import { Tokens } from "tokens.slint";
+import { Icon } from "icon.slint";
+
+export struct AppEntry {
+    id: string,
+    name: string,
+    glyph: string,
+    fill: brush,
+    fault: bool,
+    icon: image,
+    has_icon: bool,
+}
+
+component AppTile inherits Rectangle {
+    in property <AppEntry> entry;
+    callback clicked();
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 13px;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 100px;
+                height: 100px;
+                opacity: touch.pressed ? 0.62 : 1.0;
+
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 26px;
+                    border-width: 1px;
+                    clip: true;
+                    background: root.entry.has_icon ? transparent : root.entry.fill;
+                    border-color: #ffffff1f;
+
+                    if root.entry.has_icon: Image {
+                        width: 100%;
+                        height: 100%;
+                        image-fit: cover;
+                        source: root.entry.icon;
+                    }
+
+                    if !root.entry.has_icon: Icon {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        width: 46px;
+                        height: 46px;
+                        kind: root.entry.glyph;
+                        tint: #ffffff;
+                        stroke: 1.7px;
+                    }
+                }
+
+                if root.entry.fault: Rectangle {
+                    x: parent.width - self.width + 6px;
+                    y: -6px;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 11px;
+                    background: Tokens.alert;
+                    border-width: 3px;
+                    border-color: #06070B;
+
+                    Text {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        text: "!";
+                        font-family: Tokens.face;
+                        font-size: 12px;
+                        font-weight: 800;
+                        color: #ffffff;
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: Math.min(label.preferred-width + 18px, root.width);
+                height: label.preferred-height + 7px;
+                border-radius: self.height / 2;
+                background: Tokens.label_scrim;
+
+                label := Text {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    text: root.entry.name;
+                    font-family: Tokens.face;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #ffffffe6;
+                    horizontal-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Switcher inherits Rectangle {
+    in property <[AppEntry]> apps;
+    callback picked(string);
+
+    property <length> grid_h: Tokens.slot_h - 30px;
+    property <length> tile_h: (root.grid_h - Tokens.grid_gap) / 2;
+    property <length> col_pitch: Tokens.cell_w + Tokens.grid_gap;
+    property <length> row_pitch: root.tile_h + Tokens.grid_gap;
+    property <int> pages: Math.max(1, Math.ceil(root.apps.length / 8));
+    property <int> current: Math.round(-flick.viewport-x / Tokens.content_w);
+
+    x: Tokens.content_x;
+    y: Tokens.slot_y;
+    width: Tokens.content_w;
+    height: Tokens.slot_h;
+
+    flick := Flickable {
+        x: 0;
+        y: 0;
+        width: Tokens.content_w;
+        height: root.grid_h;
+        viewport-width: root.pages * Tokens.content_w;
+        viewport-height: root.grid_h;
+
+        for a[i] in root.apps: AppTile {
+            x: Math.floor(i / 8) * Tokens.content_w
+                + Math.mod(Math.mod(i, 8), 4) * root.col_pitch;
+            y: Math.floor(Math.mod(i, 8) / 4) * root.row_pitch;
+            width: Tokens.cell_w;
+            height: root.tile_h;
+            entry: a;
+            clicked => { root.picked(a.id); }
+        }
+    }
+
+    if root.pages > 1: HorizontalLayout {
+        y: root.grid_h;
+        width: 100%;
+        height: 30px;
+        alignment: center;
+        spacing: 8px;
+
+        for p[i] in root.pages: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: i == root.current ? 22px : 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: i == root.current ? #ffffffd9 : #ffffff3d;
+        }
+    }
+}

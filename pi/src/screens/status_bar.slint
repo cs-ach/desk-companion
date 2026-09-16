@@ -1,0 +1,95 @@
+import { Tokens } from "tokens.slint";
+import { Icon } from "icon.slint";
+import { Pill, Dot } from "glass.slint";
+
+export component StatusBar inherits Rectangle {
+    in property <string> lead;
+    in property <bool> show_back;
+    in property <bool> linked;
+    in property <string> trailing;
+    callback back();
+
+    x: Tokens.content_x;
+    y: Tokens.edge;
+    width: Tokens.content_w;
+    height: Tokens.status_h;
+
+    if root.show_back: Rectangle {
+        x: 0px;
+        width: 34px;
+        height: 34px;
+        border-radius: 17px;
+        border-width: 1px;
+        background: #ffffff14;
+        border-color: #ffffff1a;
+
+        Icon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            kind: "back";
+            tint: #ffffffcc;
+            stroke: 2.1px;
+        }
+
+        TouchArea {
+            clicked => { root.back(); }
+        }
+    }
+
+    Text {
+        x: root.show_back ? 46px : 0px;
+        y: (parent.height - self.height) / 2;
+        text: root.lead;
+        font-family: Tokens.face;
+        font-size: root.show_back ? Tokens.headline_size : Tokens.caption_size;
+        font-weight: root.show_back ? 700 : 500;
+        color: root.show_back ? Tokens.text : Tokens.text_2;
+    }
+
+    HorizontalLayout {
+        width: 100%;
+        height: 100%;
+        alignment: end;
+        spacing: 8px;
+
+        Pill {
+            HorizontalLayout {
+                padding-left: 11px;
+                padding-right: 11px;
+                spacing: 7px;
+                alignment: center;
+
+                Dot {
+                    fill: root.linked ? Tokens.ok : Tokens.alert;
+                }
+
+                Text {
+                    text: root.linked ? "Linked" : "Offline";
+                    font-family: Tokens.face;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #ffffffbf;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        if root.trailing != "": Pill {
+            HorizontalLayout {
+                padding-left: 11px;
+                padding-right: 11px;
+
+                Text {
+                    text: root.trailing;
+                    font-family: Tokens.face;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #ffffffbf;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

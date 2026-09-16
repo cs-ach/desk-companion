@@ -1,0 +1,148 @@
+import { Tokens } from "tokens.slint";
+import { Dock, DockItem } from "dock.slint";
+import { StatusBar } from "status_bar.slint";
+import { WidgetGrid } from "grid.slint";
+import { Slot } from "slot.slint";
+import { Switcher, AppEntry } from "switcher.slint";
+import { Settings, WallpaperOption } from "settings.slint";
+import { Fault } from "fault.slint";
+
+export { Tokens, DockItem, Slot, AppEntry, WallpaperOption }
+
+export component Shell inherits Window {
+    in property <[DockItem]> dock_items;
+    in-out property <string> page: "@home";
+
+    in property <string> status_lead: "Desk Companion";
+    in property <bool> status_back;
+    in property <bool> linked: true;
+    in property <string> status_trailing;
+
+    in property <[Slot]> slots;
+    in property <[AppEntry]> apps;
+    in property <[WallpaperOption]> wallpapers;
+
+    in property <bool> fault_visible;
+    in property <string> fault_body;
+    in property <string> fault_source;
+    in property <string> fault_message;
+    in property <string> fault_last_value;
+    in property <string> fault_last_headline;
+    in property <string> fault_last_age;
+    in property <string> fault_countdown;
+
+    callback dock_activated(string);
+    callback dock_side_changed(bool);
+    callback background_changed(string);
+    callback slot_activated(string);
+    callback plugin_picked(string);
+    callback back();
+    callback retry();
+    callback home();
+
+    callback resized(length, length);
+
+    title: "Desk Companion";
+    preferred-width: 800px;
+    preferred-height: 480px;
+    default-font-family: Tokens.face;
+    background: Tokens.ground_brush;
+
+    init => {
+        if (root.width > 0px) { Tokens.screen_w = root.width; }
+        if (root.height > 0px) { Tokens.screen_h = root.height; }
+    }
+
+    changed width => {
+        if (self.width > 0px) {
+            Tokens.screen_w = self.width;
+            root.resized(self.width, self.height);
+        }
+    }
+
+    changed height => {
+        if (self.height > 0px) {
+            Tokens.screen_h = self.height;
+            root.resized(self.width, self.height);
+        }
+    }
+
+    if Tokens.has_wallpaper: Image {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        image-fit: cover;
+        source: Tokens.wallpaper;
+    }
+
+    if Tokens.has_wallpaper: Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        background: Tokens.wallpaper_dim;
+    }
+
+    Dock {
+        items: root.dock_items;
+        active_id: root.page;
+        activated(id) => {
+            if (id == "@switcher") {
+                root.page = root.page == "@switcher" ? "@home" : "@switcher";
+            } else if (id == "@settings") {
+                root.page = root.page == "@settings" ? "@home" : "@settings";
+            } else {
+                root.page = id;
+            }
+            root.dock_activated(id);
+        }
+    }
+
+    StatusBar {
+        lead: root.status_lead;
+        show_back: root.status_back;
+        linked: root.linked;
+        trailing: root.status_trailing;
+        back => { root.back(); }
+    }
+
+    if !root.fault_visible && root.page != "@switcher" && root.page != "@settings": WidgetGrid {
+        slots: root.slots;
+        activated(id) => { root.slot_activated(id); }
+    }
+
+    if !root.fault_visible && root.page == "@switcher": Switcher {
+        apps: root.apps;
+        picked(id) => {
+            root.page = id;
+            root.plugin_picked(id);
+        }
+    }
+
+    if !root.fault_visible && root.page == "@settings": Settings {
+        dock_right: Tokens.dock_right;
+        background_name: Tokens.background;
+        wallpapers: root.wallpapers;
+        dock_side(right) => {
+            Tokens.dock_right = right;
+            root.dock_side_changed(right);
+        }
+        background_picked(name) => {
+            Tokens.background = name;
+            root.background_changed(name);
+        }
+    }
+
+    if root.fault_visible: Fault {
+        body: root.fault_body;
+        source: root.fault_source;
+        message: root.fault_message;
+        last_value: root.fault_last_value;
+        last_headline: root.fault_last_headline;
+        last_age: root.fault_last_age;
+        countdown: root.fault_countdown;
+        retry => { root.retry(); }
+        home => { root.home(); }
+    }
+}

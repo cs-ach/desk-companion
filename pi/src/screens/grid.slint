@@ -1,0 +1,21 @@
+import { Tokens } from "tokens.slint";
+import { Slot, SlotView } from "slot.slint";
+
+export component WidgetGrid inherits Rectangle {
+    in property <[Slot]> slots;
+    callback activated(string);
+
+    x: Tokens.content_x;
+    y: Tokens.slot_y;
+    width: Tokens.content_w;
+    height: Tokens.slot_h;
+
+    for s[i] in root.slots: SlotView {
+        x: (Tokens.cell_w + Tokens.grid_gap) * s.col;
+        y: (Tokens.cell_h + Tokens.grid_gap) * s.row;
+        width: Tokens.cell_w * s.cols + Tokens.grid_gap * (s.cols - 1);
+        height: Tokens.cell_h * s.rows + Tokens.grid_gap * (s.rows - 1);
+        slot: s;
+        clicked => { root.activated(s.id); }
+    }
+}

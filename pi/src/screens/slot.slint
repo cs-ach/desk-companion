@@ -1,0 +1,227 @@
+import { Tokens } from "tokens.slint";
+import { Icon } from "icon.slint";
+import { Surface } from "glass.slint";
+
+export struct Slot {
+    id: string,
+    title: string,
+    glyph: string,
+    col: int,
+    row: int,
+    cols: int,
+    rows: int,
+    state: string,
+    value: string,
+    unit: string,
+    headline: string,
+    detail: string,
+    meta: string,
+    tint: color,
+    accent: color,
+    focused: bool,
+}
+
+component Skeleton inherits Rectangle {
+    in property <length> bar_height: 11px;
+    height: root.bar_height;
+    border-radius: root.bar_height / 2;
+    background: #ffffff12;
+}
+
+component StaleChip inherits Rectangle {
+    width: 48px;
+    height: 17px;
+    border-radius: 7px;
+    background: #ffd42629;
+
+    Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: "STALE";
+        font-family: Tokens.face;
+        font-size: 9px;
+        font-weight: 700;
+        color: Tokens.caution;
+    }
+}
+
+export component SlotView inherits Rectangle {
+    in property <Slot> slot;
+    callback clicked();
+
+    clip: true;
+
+    property <bool> compact: root.width < 200px;
+    property <bool> dim: root.slot.state == "stale";
+    property <length> value_size: root.height > 300px ? Tokens.display_size : 64px;
+    property <float> fade: root.dim ? 0.45 : 1.0;
+
+    Surface {
+        width: 100%;
+        height: 100%;
+        focused: root.slot.focused;
+        tint: root.slot.state == "ready" ? root.slot.tint : transparent;
+    }
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 0px;
+
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 14px;
+                border-width: 1px;
+                background: root.slot.state == "error" ? #ff453a2e : #ffffff14;
+                border-color: root.slot.state == "error" ? #ff453a4d : transparent;
+
+                Icon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 15px;
+                    height: 15px;
+                    kind: root.slot.state == "error" ? "alert" : root.slot.glyph;
+                    tint: root.slot.state == "error" ? Tokens.alert : #ffffff8c;
+                    stroke: 2px;
+                }
+            }
+
+            Text {
+                text: root.slot.title;
+                font-family: Tokens.face;
+                font-size: Tokens.caption_size;
+                font-weight: 600;
+                color: root.dim ? Tokens.text_3 : Tokens.text_2;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+
+            if root.slot.state == "stale": StaleChip { }
+
+            if root.slot.state == "ready" && root.slot.meta != "": Text {
+                text: root.slot.meta;
+                font-family: Tokens.face;
+                font-size: 12px;
+                font-weight: 500;
+                color: Tokens.text_3;
+                vertical-alignment: center;
+            }
+        }
+
+        if (root.slot.state == "ready" || root.slot.state == "stale") && !root.compact: VerticalLayout {
+            spacing: 0px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+
+                Text {
+                    text: root.slot.value;
+                    font-family: Tokens.face;
+                    font-size: root.value_size;
+                    font-weight: 800;
+                    letter-spacing: -3.5px;
+                    color: root.dim ? Tokens.text_3 : root.slot.accent;
+                }
+
+                if root.slot.unit != "": VerticalLayout {
+                    alignment: start;
+                    padding-top: root.value_size * 0.33;
+
+                    Text {
+                        text: root.slot.unit;
+                        font-family: Tokens.face;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: Tokens.text_3;
+                    }
+                }
+            }
+
+            Text {
+                text: root.slot.headline;
+                font-family: Tokens.face;
+                font-size: Tokens.title_size;
+                font-weight: 600;
+                letter-spacing: -0.5px;
+                color: root.dim ? Tokens.text_2 : Tokens.text;
+                wrap: word-wrap;
+            }
+
+            if root.slot.detail != "": Text {
+                text: root.slot.detail;
+                font-family: Tokens.face;
+                font-size: Tokens.caption_size;
+                font-weight: 500;
+                color: Tokens.text_2;
+                wrap: word-wrap;
+            }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        if root.slot.state == "empty": Text {
+            text: "No data yet";
+            font-family: Tokens.face;
+            font-size: Tokens.caption_size;
+            font-weight: 500;
+            color: Tokens.text_3;
+        }
+
+        if root.slot.state == "loading": VerticalLayout {
+            spacing: 9px;
+            Skeleton { bar_height: 26px; width: 68%; }
+            Skeleton { }
+            Skeleton { width: 74%; }
+        }
+
+        if root.slot.state == "error": VerticalLayout {
+            spacing: 4px;
+            Text {
+                text: "Unavailable";
+                font-family: Tokens.face;
+                font-size: root.compact ? Tokens.caption_size : Tokens.headline_size;
+                font-weight: 600;
+                color: Tokens.text;
+            }
+            Text {
+                text: "Tap for detail";
+                font-family: Tokens.face;
+                font-size: 12px;
+                font-weight: 500;
+                color: Tokens.text_3;
+            }
+        }
+
+        if (root.slot.state == "ready" || root.slot.state == "stale") && root.compact: VerticalLayout {
+            spacing: 3px;
+
+            Text {
+                text: root.slot.headline;
+                font-family: Tokens.face;
+                font-size: 17px;
+                font-weight: 600;
+                color: root.dim ? Tokens.text_2 : Tokens.text;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.slot.detail;
+                font-family: Tokens.face;
+                font-size: Tokens.caption_size;
+                font-weight: 500;
+                color: Tokens.text_3;
+                overflow: elide;
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}

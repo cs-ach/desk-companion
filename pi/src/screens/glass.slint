@@ -1,0 +1,212 @@
+import { Tokens } from "tokens.slint";
+
+component Rims inherits Rectangle {
+    in property <length> radius;
+    in property <bool> hairline: true;
+    in property <bool> bottom: true;
+
+    background: transparent;
+
+    if root.hairline: Rectangle {
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: Tokens.rim_hairline;
+        background: transparent;
+    }
+
+    Rectangle {
+        x: root.radius / 2;
+        y: 1px;
+        width: root.width - root.radius;
+        height: 1px;
+        background: Tokens.rim_top;
+    }
+
+    if root.bottom: Rectangle {
+        x: root.radius / 2;
+        y: root.height - 2px;
+        width: root.width - root.radius;
+        height: 1px;
+        background: Tokens.rim_bottom;
+    }
+}
+
+component Backdrop inherits Rectangle {
+    in property <bool> heavy: false;
+    in property <length> origin_x;
+    in property <length> origin_y;
+
+    background: transparent;
+
+    Image {
+        x: -root.origin_x;
+        y: -root.origin_y;
+        width: Tokens.screen_w;
+        height: Tokens.screen_h;
+        image-fit: cover;
+        source: root.heavy ? Tokens.backdrop_menu : Tokens.backdrop_panel;
+    }
+}
+
+export component Panel inherits Rectangle {
+    in property <bool> focused: false;
+    in property <color> tint: transparent;
+
+    property <bool> sampling: Tokens.has_wallpaper && !Tokens.reduce_transparency;
+
+    border-radius: Tokens.r_panel;
+    border-width: 1px;
+    clip: true;
+    background: root.sampling
+        ? transparent
+        : (Tokens.has_wallpaper
+            ? (root.focused ? #1b1f28 : #0b0d12)
+            : (root.focused ? Tokens.selected : Tokens.panel));
+    border-color: root.focused ? Tokens.selected_edge : Tokens.glass_border;
+
+    if root.sampling: Backdrop {
+        width: 100%;
+        height: 100%;
+        origin_x: root.absolute-position.x;
+        origin_y: root.absolute-position.y;
+    }
+
+    if root.sampling && root.focused: Rectangle {
+        background: #ffffff1a;
+    }
+
+    Rectangle {
+        background: @linear-gradient(180deg, Tokens.glass_tint_top 0%, Tokens.glass_tint_bottom 100%);
+    }
+
+    Rectangle {
+        background: @linear-gradient(145deg, root.tint 0%, transparent 64%);
+    }
+
+    Rims {
+        width: 100%;
+        height: 100%;
+        radius: root.border-radius;
+    }
+
+    @children
+}
+
+export component Menu inherits Rectangle {
+    property <bool> sampling: Tokens.has_wallpaper && !Tokens.reduce_transparency;
+
+    border-radius: Tokens.r_panel;
+    border-width: 1px;
+    clip: true;
+    background: root.sampling ? transparent : (Tokens.has_wallpaper ? #16161b : Tokens.panel);
+    border-color: Tokens.glass_border;
+
+    if root.sampling: Backdrop {
+        width: 100%;
+        height: 100%;
+        heavy: true;
+        origin_x: root.absolute-position.x;
+        origin_y: root.absolute-position.y;
+    }
+
+    Rectangle {
+        background: @linear-gradient(180deg, Tokens.glass_tint_top 0%, Tokens.glass_tint_bottom 100%);
+    }
+
+    Rims {
+        width: 100%;
+        height: 100%;
+        radius: root.border-radius;
+        hairline: false;
+        bottom: false;
+    }
+
+    @children
+}
+
+export component Surface inherits Rectangle {
+    in property <bool> focused: false;
+    in property <color> tint: transparent;
+
+    property <bool> sampling: Tokens.has_wallpaper && !Tokens.reduce_transparency;
+
+    border-radius: Tokens.r_panel;
+    border-width: 1px;
+    clip: true;
+    background: root.sampling
+        ? transparent
+        : (Tokens.has_wallpaper
+            ? (root.focused ? #171a22 : #0b0d12)
+            : (root.focused ? Tokens.selected : Tokens.panel));
+    border-color: root.focused ? Tokens.selected_edge : Tokens.glass_border;
+
+    if root.sampling: Backdrop {
+        width: 100%;
+        height: 100%;
+        origin_x: root.absolute-position.x;
+        origin_y: root.absolute-position.y;
+    }
+
+    if root.sampling && root.focused: Rectangle {
+        background: #ffffff1a;
+    }
+
+    Rectangle {
+        background: @linear-gradient(180deg, Tokens.glass_tint_top 0%, Tokens.glass_tint_bottom 100%);
+    }
+
+    Rectangle {
+        background: @linear-gradient(145deg, root.tint 0%, transparent 64%);
+    }
+
+    Rims {
+        width: 100%;
+        height: 100%;
+        radius: root.border-radius;
+    }
+
+    @children
+}
+
+export component Pill inherits Rectangle {
+    in property <color> fill: Tokens.chip_fill;
+    in property <color> edge: Tokens.glass_border;
+
+    property <bool> sampling: Tokens.has_wallpaper && !Tokens.reduce_transparency;
+
+    height: 26px;
+    border-radius: root.height / 2;
+    border-width: 1px;
+    clip: true;
+    background: root.sampling ? transparent : root.fill;
+    border-color: root.edge;
+
+    if root.sampling: Backdrop {
+        width: 100%;
+        height: 100%;
+        origin_x: root.absolute-position.x;
+        origin_y: root.absolute-position.y;
+    }
+
+    Rectangle {
+        background: @linear-gradient(180deg, Tokens.glass_tint_top 0%, Tokens.glass_tint_bottom 100%);
+    }
+
+    Rims {
+        width: 100%;
+        height: 100%;
+        radius: root.border-radius;
+        hairline: false;
+        bottom: false;
+    }
+
+    @children
+}
+
+export component Dot inherits Rectangle {
+    in property <color> fill;
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background: root.fill;
+}

@@ -1,0 +1,132 @@
+import { Tokens } from "tokens.slint";
+import { Icon } from "icon.slint";
+import { Menu } from "glass.slint";
+
+export struct DockItem {
+    id: string,
+    glyph: string,
+    fault: bool,
+    icon: image,
+    has_icon: bool,
+}
+
+component DockSlot inherits Rectangle {
+    in property <string> glyph;
+    in property <bool> active;
+    in property <bool> fault;
+    in property <image> icon;
+    in property <bool> has_icon;
+    callback clicked();
+
+    width: Tokens.dock_slot;
+    height: Tokens.dock_slot;
+    border-radius: root.has_icon ? 16px : Tokens.dock_slot / 2;
+    border-width: 1px;
+    background: root.active ? #ffffff29 : (touch.pressed ? #ffffff1a : transparent);
+    border-color: root.active ? #ffffff38 : transparent;
+    opacity: touch.pressed ? 0.72 : 1.0;
+
+    if root.has_icon: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: #ffffff1f;
+        clip: true;
+        opacity: root.active ? 1.0 : 0.66;
+
+        Image {
+            width: 100%;
+            height: 100%;
+            image-fit: cover;
+            source: root.icon;
+        }
+    }
+
+    if !root.has_icon: Icon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        kind: root.glyph;
+        tint: root.fault ? Tokens.alert : (root.active ? Tokens.text : #ffffff6b);
+    }
+
+    if root.fault: Rectangle {
+        x: parent.width - self.width + 3px;
+        y: -3px;
+        width: 13px;
+        height: 13px;
+        border-radius: 6.5px;
+        background: Tokens.ground;
+        border-width: 2px;
+        border-color: Tokens.ground;
+
+        Rectangle {
+            width: 9px;
+            height: 9px;
+            border-radius: 4.5px;
+            background: Tokens.alert;
+        }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Dock inherits Rectangle {
+    in property <[DockItem]> items;
+    in property <bool> switcher_active;
+    in property <bool> settings_active;
+    in property <string> active_id;
+    callback activated(string);
+
+    property <length> pitch: Tokens.dock_slot + Tokens.dock_gap;
+
+    x: Tokens.dock_x;
+    y: (Tokens.screen_h - self.height) / 2;
+    width: Tokens.dock_w;
+    height: root.items.length * root.pitch + 146px;
+
+    Menu {
+        width: 100%;
+        height: 100%;
+        border-radius: Tokens.r_dock;
+    }
+
+    for item[i] in root.items: DockSlot {
+        x: (parent.width - self.width) / 2;
+        y: 12px + i * root.pitch;
+        glyph: item.glyph;
+        active: item.id == active_id;
+        fault: item.fault;
+        icon: item.icon;
+        has_icon: item.has_icon;
+        clicked => { root.activated(item.id); }
+    }
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 16px + root.items.length * root.pitch;
+        width: 26px;
+        height: 1px;
+        background: #ffffff1f;
+    }
+
+    DockSlot {
+        x: (parent.width - self.width) / 2;
+        y: 29px + root.items.length * root.pitch;
+        glyph: "apps";
+        active: root.active_id == "@switcher";
+        clicked => { root.activated("@switcher"); }
+    }
+
+    DockSlot {
+        x: (parent.width - self.width) / 2;
+        y: 85px + root.items.length * root.pitch;
+        glyph: "sliders";
+        active: root.active_id == "@settings";
+        clicked => { root.activated("@settings"); }
+    }
+}

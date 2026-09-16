@@ -1,0 +1,217 @@
+import { Tokens } from "tokens.slint";
+import { Icon } from "icon.slint";
+import { Surface } from "glass.slint";
+
+component Action inherits Rectangle {
+    in property <string> label;
+    in property <bool> primary;
+    callback clicked();
+
+    height: 46px;
+    min-width: self.text_width + 48px;
+    max-width: self.text_width + 48px;
+    border-radius: 23px;
+    border-width: 1px;
+    background: root.primary ? Tokens.control : #ffffff17;
+    border-color: root.primary ? Tokens.control : #ffffff1f;
+
+    property <length> text_width: label_text.preferred-width;
+
+    label_text := Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.label;
+        font-family: Tokens.face;
+        font-size: Tokens.body_size;
+        font-weight: 600;
+        color: root.primary ? Tokens.text : #ffffffd9;
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Fault inherits Rectangle {
+    in property <string> title: "This screen didn't load";
+    in property <string> body;
+    in property <string> source;
+    in property <string> message;
+    in property <string> last_value;
+    in property <string> last_headline;
+    in property <string> last_age;
+    in property <string> countdown;
+    callback retry();
+    callback home();
+
+    x: Tokens.content_x;
+    y: Tokens.slot_y;
+    width: Tokens.content_w;
+    height: Tokens.slot_h;
+
+    Surface {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 560px;
+        height: card.preferred-height;
+        border-radius: 28px;
+        tint: #ff453a24;
+
+        card := VerticalLayout {
+            padding: 22px;
+            spacing: 0px;
+
+            HorizontalLayout {
+                alignment: start;
+
+                Rectangle {
+                width: 50px;
+                height: 50px;
+                border-radius: 25px;
+                border-width: 1px;
+                background: #ff453a2e;
+                border-color: #ff453a4d;
+
+                Icon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 24px;
+                    height: 24px;
+                    kind: "alert";
+                    tint: Tokens.alert;
+                    stroke: 2.1px;
+                }
+                }
+            }
+
+            Rectangle { height: 16px; }
+
+            Text {
+                text: root.title;
+                font-family: Tokens.face;
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: -0.7px;
+                color: Tokens.text;
+            }
+
+            Rectangle { height: 7px; }
+
+            Text {
+                text: root.body;
+                font-family: Tokens.face;
+                font-size: Tokens.body_size;
+                font-weight: 500;
+                color: Tokens.text_2;
+                wrap: word-wrap;
+            }
+
+            Rectangle { height: 16px; }
+
+            Rectangle {
+                height: trace.preferred-height + 22px;
+                border-radius: Tokens.r_nested;
+                border-width: 1px;
+                background: #0000004d;
+                border-color: #ffffff12;
+
+                trace := VerticalLayout {
+                    padding: 11px;
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 4px;
+
+                    Text {
+                        text: root.source;
+                        font-family: "monospace";
+                        font-size: 12px;
+                        color: Tokens.text_2;
+                    }
+
+                    Text {
+                        text: root.message;
+                        font-family: "monospace";
+                        font-size: 12px;
+                        color: #ff8a7d;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            Rectangle { height: 10px; }
+
+            if root.last_value != "": Rectangle {
+                height: 46px;
+                border-radius: Tokens.r_nested;
+                border-width: 1px;
+                background: #ffffff0d;
+                border-color: #ffffff12;
+
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 13px;
+
+                    Text {
+                        text: root.last_value;
+                        font-family: Tokens.face;
+                        font-size: 22px;
+                        font-weight: 800;
+                        letter-spacing: -0.7px;
+                        color: #ffffff8c;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.last_headline;
+                        font-family: Tokens.face;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: Tokens.text_2;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: root.last_age;
+                        font-family: Tokens.face;
+                        font-size: Tokens.caption_size;
+                        font-weight: 500;
+                        color: Tokens.text_3;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle { height: 16px; }
+
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: start;
+
+                Action {
+                    label: "Try again";
+                    primary: true;
+                    clicked => { root.retry(); }
+                }
+
+                Action {
+                    label: "Go home";
+                    clicked => { root.home(); }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    text: root.countdown;
+                    font-family: Tokens.face;
+                    font-size: Tokens.caption_size;
+                    font-weight: 500;
+                    color: Tokens.text_3;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

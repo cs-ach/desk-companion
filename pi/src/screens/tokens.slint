@@ -1,0 +1,103 @@
+export global Tokens {
+    out property <color> ground: #06070B;
+
+    out property <brush> bg_ember: @linear-gradient(135deg, #150a0e 0%, #06070b 48%, #0b0a1a 100%);
+    out property <brush> bg_tide: @linear-gradient(135deg, #04141b 0%, #06070b 50%, #081426 100%);
+    out property <brush> bg_violet: @linear-gradient(135deg, #150a20 0%, #06070b 50%, #1c0a18 100%);
+    out property <brush> bg_mono: #06070B;
+
+    in-out property <string> background: "ember";
+    out property <brush> ground_brush:
+        root.background == "tide" ? root.bg_tide
+        : root.background == "violet" ? root.bg_violet
+        : root.background == "mono" ? root.bg_mono
+        : root.bg_ember;
+
+    in-out property <bool> dock_right: false;
+
+    in-out property <bool> has_wallpaper: false;
+    in-out property <bool> reduce_transparency: false;
+    in-out property <image> wallpaper;
+    in-out property <image> backdrop_panel;
+    in-out property <image> backdrop_menu;
+
+    out property <color> glass_tint_top: #ffffff0f;
+    out property <color> glass_tint_bottom: #b3b3b30f;
+    out property <color> glass_border: #ffffff14;
+    out property <color> rim_top: #ffffff80;
+    out property <color> rim_hairline: #ffffff1a;
+    out property <color> rim_bottom: #ffffff0f;
+    out property <color> menu_surface: #16161b;
+    out property <brush> wallpaper_dim: @linear-gradient(180deg,
+        #000000a6 0%, #0000004d 26%, #0000004d 74%, #000000a6 100%);
+    out property <color> label_scrim: root.has_wallpaper ? #000000a6 : #00000000;
+
+    out property <color> chip_fill: root.has_wallpaper ? #000000a6 : #ffffff12;
+    out property <color> chip_edge: root.has_wallpaper ? #ffffff2e : #ffffff17;
+
+    out property <color> panel: #ffffff0d;
+    out property <color> panel_edge: #ffffff17;
+    out property <color> panel_highlight: #ffffff29;
+    out property <color> selected: #ffffff24;
+    out property <color> selected_edge: #ffffff66;
+    out property <color> selected_highlight: #ffffff80;
+
+    out property <color> text: #ffffff;
+    out property <color> text_2: root.has_wallpaper ? #ffffffb8 : #ffffff80;
+    out property <color> text_3: root.has_wallpaper ? #ffffff8f : #ffffff4d;
+
+    out property <color> alert: #FF453A;
+    out property <color> ok: #30D158;
+    out property <color> caution: #FFD426;
+    out property <color> control: #6E5BFF;
+
+    out property <string> face: "Manrope";
+    out property <length> display_size: 84px;
+    out property <length> title_size: 23px;
+    out property <length> headline_size: 20px;
+    out property <length> body_size: 15px;
+    out property <length> caption_size: 13px;
+    out property <length> label_size: 11px;
+
+    out property <length> r_dock: 32px;
+    out property <length> r_panel: 26px;
+    out property <length> r_group: 20px;
+    out property <length> r_nested: 14px;
+
+    // Driven by Shell from the real window size. The defaults are the design
+    // target; on the device the KMS mode decides, so nothing below may assume
+    // 800x480.
+    in-out property <length> screen_w: 800px;
+    in-out property <length> screen_h: 480px;
+
+    out property <length> edge: 14px;
+    out property <length> dock_margin: 12px;
+    out property <length> dock_x: root.dock_right
+        ? root.screen_w - root.dock_margin - root.dock_w
+        : root.dock_margin;
+    out property <length> dock_w: 64px;
+    out property <length> dock_slot: 48px;
+    out property <length> dock_gap: 8px;
+
+    // The dock keeps its fixed width on whichever side it sits; the content
+    // column takes whatever is left.
+    out property <length> content_x: root.dock_right
+        ? root.edge
+        : root.dock_margin + root.dock_w + root.dock_margin;
+    out property <length> content_w: root.screen_w
+        - root.dock_margin - root.dock_w - root.dock_margin - root.edge;
+    out property <length> content_h: root.screen_h - 2 * root.edge;
+    out property <length> status_h: 34px;
+    out property <length> gap: 12px;
+
+    out property <length> slot_y: 60px;
+    out property <length> slot_h: root.screen_h - root.slot_y - root.edge;
+
+    out property <int> grid_cols: 4;
+    out property <int> grid_rows: 2;
+    out property <length> grid_gap: 14px;
+    out property <length> cell_w:
+        (root.content_w - root.grid_gap * (root.grid_cols - 1)) / root.grid_cols;
+    out property <length> cell_h:
+        (root.slot_h - root.grid_gap * (root.grid_rows - 1)) / root.grid_rows;
+}

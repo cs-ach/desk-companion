@@ -13,7 +13,7 @@ fn render_once(path: &PathBuf, wanted: &str) -> Result<()> {
 
     if result.has_errors() {
         eprintln!("{} did not compile", path.display());
-        return Ok(()); // don't bail — let the loop ask for another path instead of killing the process
+        return Ok(());
     }
 
     let Some(definition) = result.component(wanted) else {
@@ -39,7 +39,6 @@ fn render_once(path: &PathBuf, wanted: &str) -> Result<()> {
         }
     }
 
-    // Blocks until the window is closed, then control returns to main's loop.
     instance.run().context("running the event loop")?;
     Ok(())
 }

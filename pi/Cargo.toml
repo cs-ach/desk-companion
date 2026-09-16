@@ -14,8 +14,23 @@ serde.workspace = true
 serde_json.workspace = true
 serialport = { version = "4.10.1", default-features = false }
 base64 = "0.23.1"
-slint-interpreter = "1"
-
-[dev-dependencies]
-slint-interpreter = "1.17"
+slint-interpreter = { version = "1", default-features = false, features = ["compat-1-2"] }
+# Constructing Value::Model / Value::Brush means naming ModelRc and Brush, which
+# slint-interpreter exposes in its public API but does not re-export. Must track
+# slint-interpreter exactly or the types are nominally different.
+i-slint-core = "=1.17.1"
+# blocks on the interpreter's async compile step; there is no runtime here
 spin_on = "0.1"
+fontique = { version = "0.10", default-features = false, features = ["fontconfig-dlopen"], optional = true }
+
+[features]
+default = ["desktop"]
+desktop = [
+    "slint-interpreter/backend-winit",
+    "slint-interpreter/renderer-femtovg",
+]
+device = [
+    "slint-interpreter/backend-linuxkms-noseat",
+    "slint-interpreter/renderer-femtovg",
+    "dep:fontique",
+]
