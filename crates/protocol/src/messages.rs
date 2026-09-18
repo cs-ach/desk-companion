@@ -34,6 +34,10 @@ pub enum HostToPi {
 
     SyncComplete,
 
+    WallpaperRequest,
+
+    WallpaperComplete,
+
     UpdateBegin {
         version: String,
         size_bytes: u64,
@@ -44,6 +48,8 @@ pub enum HostToPi {
         data: String,
     },
     UpdateComplete,
+    
+    Ready,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

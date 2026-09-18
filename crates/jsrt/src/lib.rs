@@ -6,7 +6,7 @@ mod runtime;
 pub mod globals;
 
 pub use rquickjs;
-pub use error::{Error, Result};
+pub use error::{Error, Result, describe};
 pub use json::Json;
 pub use logger::Logger;
-pub use runtime::{Entry, RustFunction, Sandbox};
+pub use runtime::{Entry, Running, RunningPlugin, RustFunction, Sandbox};

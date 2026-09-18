@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::TryRecvError;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,10 @@ use protocol::{HostToPi, PROTOCOL_VERSION, PiToHost};
 use serialport::{ClearBuffer, SerialPort};
 
 use crate::Host;
+
+pub type StateUpdate = (String, serde_json::Value);
+pub type StateSender = std::sync::mpsc::Sender<StateUpdate>;
+pub type StateReceiver = std::sync::mpsc::Receiver<StateUpdate>;
 
 pub const GADGET_SERIAL: &str = "/dev/ttyACM0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -51,6 +56,14 @@ impl<'a> Session<'a> {
             if self.last_alive.elapsed() >= NOT_ALIVE_LIMIT {
                 eprintln!("link: nothing from the device in {NOT_ALIVE_LIMIT:?}");
                 return Ok("device silent");
+            }
+
+            loop {
+                match self.host.state_rx.try_recv() {
+                    Ok((module_id, payload)) => self.send_state(module_id, payload)?,
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => break,
+                }
             }
 
             match read_frame::<_, PiToHost>(&mut self.port) {
@@ -132,6 +145,9 @@ impl<'a> Session<'a> {
             PiToHost::Ready => {
                 println!("link: device reports it is in sync");
                 self.host.start_all();
+                let message = HostToPi::Ready;
+                println!("Pi Ready starting all host!");
+                let _ = write_frame(&mut self.port, &message);
             }
 
             PiToHost::Heartbeat => {
@@ -144,8 +160,7 @@ impl<'a> Session<'a> {
         Ok(())
     }
 
-    pub fn send_state(&mut self, module_id: String, state: HashMap<String, String>) -> Result<()> {
-        let payload = serde_json::to_value(&state)?;
+    pub fn send_state(&mut self, module_id: String, payload: serde_json::Value) -> Result<()> {
         Ok(write_frame(&mut self.port, &HostToPi::State { module_id, payload })?)
     }
 

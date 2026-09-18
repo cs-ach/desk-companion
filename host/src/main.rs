@@ -9,53 +9,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 use anyhow::{Context, Result};
-use jsrt::{Entry, Logger, RustFunction, Sandbox, globals};
+use jsrt::{Entry, Logger, Running, RunningPlugin, RustFunction, Sandbox, globals};
 use plugin::{ConfigStore, FileManifest, Plugin, device_manifest};
 
+use crate::link::{StateReceiver, StateSender};
+
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
-
-struct RunningPlugin {
-    shutdown: Arc<AtomicBool>,
-    handle: JoinHandle<()>,
-}
-
-impl RunningPlugin {
-    fn signal(&self) {
-        self.shutdown.store(true, Ordering::Relaxed);
-    }
-
-    fn join(self, id: &str) {
-        if self.handle.join().is_err() {
-            eprintln!("plugin {id} panicked");
-        }
-    }
-
-    fn stop(self, id: &str) {
-        self.signal();
-        self.join(id);
-    }
-}
-
-#[derive(Default)]
-struct Running {
-    plugins: HashMap<String, RunningPlugin>,
-}
-
-impl Running {
-    fn stop_all(self) {
-        for running in self.plugins.values() {
-            running.signal();
-        }
-        for (id, running) in self.plugins {
-            running.join(&id);
-        }
-    }
-}
 
 struct Host {
     plugins: Vec<Arc<Plugin>>,
     store: ConfigStore,
     running: Option<Running>,
+    state_tx: StateSender,
+    state_rx: StateReceiver,
 }
 
 
@@ -90,10 +56,14 @@ impl Host {
         let manifest = device_manifest(&loaded)?;
         println!("\n{} file(s) to keep in sync with the device\n", manifest.files.len());
 
+        let (state_tx, state_rx) = std::sync::mpsc::channel();
+
         Ok(Self {
             plugins: loaded.into_iter().map(Arc::new).collect(),
             store,
             running: None,
+            state_tx,
+            state_rx,
         })
     }
 
@@ -104,6 +74,7 @@ impl Host {
     fn spawn(&self, plugin: &Arc<Plugin>) -> RunningPlugin {
         let logger = Arc::new(Logger::new(&plugin.manifest.id, &plugin.logs_dir()));
         let client = http::HttpClient::new();
+        let state_tx = self.state_tx.clone();
         let shutdown = Arc::new(AtomicBool::new(false));
 
         let functions = vec![
@@ -122,9 +93,15 @@ impl Host {
                 name: "fetch",
                 build: Box::new(move |ctx, plugin| desk::fetch(ctx, plugin, client.clone())),
             },
+            RustFunction {
+                name: "sendState",
+                build: Box::new(move |ctx, plugin| {
+                    desk::send_state(ctx, plugin, state_tx.clone())
+                }),
+            },
         ];
 
-        let handle = Sandbox::start_thread(
+        let (calls, handle) = Sandbox::start_thread(
             plugin.clone(),
             PLUGIN_MEMORY_LIMIT,
             functions,
@@ -133,19 +110,19 @@ impl Host {
             Entry::Host,
         );
 
-        RunningPlugin { shutdown, handle }
+        RunningPlugin::new(shutdown, calls, handle)
     }
 
     fn start_all(&mut self) {
         self.stop_all();
 
-        let mut plugins = HashMap::with_capacity(self.plugins.len());
+        let mut running = Running::default();
         for p in &self.plugins {
-            plugins.insert(p.manifest.id.clone(), self.spawn(p));
+            running.insert(p.manifest.id.clone(), self.spawn(p));
         }
 
-        println!("started {} plugin(s)", plugins.len());
-        self.running = Some(Running { plugins });
+        println!("started {} plugin(s)", running.len());
+        self.running = Some(running);
     }
 
     fn stop_all(&mut self) {
@@ -165,16 +142,13 @@ impl Host {
 
         self.running
             .get_or_insert_with(Running::default)
-            .plugins
             .insert(id.to_owned(), running);
         Ok(())
     }
 
     fn stop(&mut self, id: &str) {
-        if let Some(running) = &mut self.running
-            && let Some(plugin) = running.plugins.remove(id)
-        {
-            plugin.stop(id);
+        if let Some(running) = &mut self.running {
+            running.stop(id);
         }
     }
     

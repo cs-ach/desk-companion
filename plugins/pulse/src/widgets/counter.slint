@@ -1,0 +1,37 @@
+export component Counter inherits Rectangle {
+    in property <int> count: 0;
+    in property <string> label: "waiting";
+    in property <string> uptime: "";
+
+    background: #171c21;
+    border-radius: 12px;
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 4px;
+
+        Text {
+            text: root.count;
+            font-size: 30px;
+            font-weight: 700;
+            color: #f2f5f7;
+        }
+
+        Text {
+            text: root.label;
+            font-size: 13px;
+            color: #b3bcc4;
+            overflow: elide;
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+        }
+
+        Text {
+            text: root.uptime;
+            font-size: 11px;
+            color: #7d8792;
+        }
+    }
+}

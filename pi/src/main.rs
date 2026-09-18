@@ -5,7 +5,7 @@ mod desk;
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::JoinHandle};
 
 use anyhow::{Context, Result};
-use jsrt::{Entry, Logger, RustFunction, Sandbox, globals};
+use jsrt::{Entry, Logger, Running, RunningPlugin, RustFunction, Sandbox, globals};
 use pi::screen::{DockItem, Screen, ScreenHandle};
 use std::path::Path;
 use plugin::{FileManifest, Plugin, SyncPlan};
@@ -14,50 +14,6 @@ use protocol::FileEntry;
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 const DOCK_PLUGINS: usize = 3;
 const GEOMETRY_POLL: std::time::Duration = std::time::Duration::from_secs(1);
-
-struct RunningPlugin {
-    shutdown: Arc<AtomicBool>,
-    handle: JoinHandle<()>,
-}
-
-impl RunningPlugin {
-    fn signal(&self) {
-        self.shutdown.store(true, Ordering::Relaxed);
-    }
-
-    fn join(self, id: &str) {
-        if self.handle.join().is_err() {
-            eprintln!("plugin {id} panicked");
-        }
-    }
-
-    fn stop(self, id: &str) {
-        self.signal();
-        self.join(id);
-    }
-}
-
-#[derive(Default)]
-struct Running {
-    plugins: HashMap<String, RunningPlugin>,
-}
-
-impl Running {
-    fn stop(&mut self, id: &str) {
-        if let Some(running) = self.plugins.remove(id) {
-            running.stop(id);
-        }
-    }
-
-    fn stop_all(self) {
-        for running in self.plugins.values() {
-            running.signal();
-        }
-        for (id, running) in self.plugins {
-            running.join(&id);
-        }
-    }
-}
 
 struct Pi {
     dir: PathBuf,
@@ -89,7 +45,7 @@ impl Pi {
     fn loaded(&self) -> Vec<Arc<Plugin>> {
         self.plugins
             .iter()
-            .filter(|p| self.running.plugins.contains_key(&p.manifest.id))
+            .filter(|p| self.running.contains(&p.manifest.id))
             .cloned()
             .collect()
     }
@@ -132,8 +88,7 @@ impl Pi {
 
         let gone: Vec<String> = self
             .running
-            .plugins
-            .keys()
+            .ids()
             .filter(|id| !self.plugins.iter().any(|p| &&p.manifest.id == id))
             .cloned()
             .collect();
@@ -163,7 +118,7 @@ impl Pi {
             },
         ];
 
-        let handle = Sandbox::start_thread(
+        let (calls, handle) = Sandbox::start_thread(
             plugin.clone(),
             PLUGIN_MEMORY_LIMIT,
             functions,
@@ -172,7 +127,7 @@ impl Pi {
             Entry::Pi,
         );
 
-        RunningPlugin { shutdown, handle }
+        RunningPlugin::new(shutdown, calls, handle)
     }
 
     fn start_matching(&mut self, requires_host: bool) -> usize {
@@ -187,7 +142,7 @@ impl Pi {
             let id = &plugin.manifest.id;
             self.running.stop(id);
             let running = self.spawn(plugin);
-            self.running.plugins.insert(id.clone(), running);
+            self.running.insert(id.clone(), running);
         }
 
         self.publish();
@@ -238,26 +193,6 @@ impl Pi {
     }
 }
 
-fn wallpaper_options(dir: &Path) -> Vec<(String, PathBuf)> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-
-    let mut found: Vec<(String, PathBuf)> = entries
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png" || x == "jpg"))
-        .filter_map(|p| {
-            p.file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| (s.to_string(), p.clone()))
-        })
-        .collect();
-
-    found.sort_by(|a, b| a.0.cmp(&b.0));
-    found
-}
-
 fn dock_from(plugins: &[Arc<Plugin>]) -> Vec<DockItem> {
     let mut items = vec![DockItem {
         id: "@home".into(),
@@ -289,7 +224,7 @@ fn main() -> Result<()> {
     screen.set_dock(&[]);
     screen.set_status("Desk Companion", false, false, "0 plugins");
 
-    let wallpapers = wallpaper_options(&pi::screen::wallpapers_dir());
+    let wallpapers = pi::wallpaper::options(&pi::screen::wallpapers_dir());
     screen.set_wallpaper_options(&wallpapers);
 
     if let Some((id, path)) = wallpapers.first() {

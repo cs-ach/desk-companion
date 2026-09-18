@@ -11,3 +11,7 @@ async function init() {
 async function tick(){
     log("INFO", "TICK!");
 }
+
+async function onState(state){
+    log("info", state)
+}

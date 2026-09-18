@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::fmt::Write as _;
-
 use jsrt::rquickjs::{self, Ctx, Exception, Function, IntoJs, Object, Value, function::{Async, Opt}};
+use jsrt::describe;
 use plugin::Plugin;
 use reqwest::Method;
 
@@ -44,16 +43,6 @@ fn parse_options<'js>(ctx: &Ctx<'js>, options: Opt<Object<'js>>) -> rquickjs::Re
         .ok_or_else(|| Exception::throw_message(ctx, &format!("unsupported fetch method: {method_name}")))?;
 
     Ok(FetchOptions { method, headers, body })
-}
-
-fn describe(error: &dyn std::error::Error) -> String {
-    let mut out = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        let _ = write!(out, ": {cause}");
-        source = cause.source();
-    }
-    out
 }
 
 impl<'js> IntoJs<'js> for HttpResponse {

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use i_slint_core::graphics::{Image, Rgba8Pixel, SharedPixelBuffer};
@@ -7,6 +7,26 @@ pub struct Prepared {
     pub sharp: Image,
     pub panel: Image,
     pub menu: Image,
+}
+
+pub fn options(dir: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+
+    let mut found: Vec<(String, PathBuf)> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "png" || x == "jpg"))
+        .filter_map(|p| {
+            p.file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| (s.to_string(), p.clone()))
+        })
+        .collect();
+
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
 }
 
 pub fn empty_image() -> Image {

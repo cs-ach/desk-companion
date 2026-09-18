@@ -49,6 +49,31 @@ function describe(q) {
     return `M${q.mag.toFixed(1)} ${q.place}`;
 }
 
+function ago(q) {
+    const minutes = Math.floor((Date.now() - q.time) / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    return `${Math.floor(minutes / 60)}h ago`;
+}
+
+// The keys here are the `in` properties of src/widgets/latest.slint. sendState()
+// ships them to the device as one JSON payload; anything the widget does not
+// declare is simply ignored there.
+async function publish(quakes) {
+    const newest = quakes[0];
+
+    if (!newest) {
+        await sendState({ magnitude: "\u2014", place: "no data", ago: "" });
+        return;
+    }
+
+    await sendState({
+        magnitude: `M${newest.mag.toFixed(1)}`,
+        place: newest.place,
+        ago: ago(newest),
+    });
+}
+
 async function init() {
     startedAt = Date.now();
     log("info", `watching for M${MIN_MAGNITUDE.toFixed(1)}+ quakes`);
@@ -61,6 +86,8 @@ async function init() {
         if (quakes.length > 0) {
             log("info", `most recent: ${describe(quakes[0])}`);
         }
+
+        await publish(quakes);
     } catch (e) {
         // Deliberately NOT fatal. The host treats a rejected init() as fatal and
         // stops the plugin, so only throw from here for setup that cannot be
@@ -92,6 +119,8 @@ async function tick() {
                 log("info", `  ${describe(q)}`);
             }
         }
+
+        await publish(quakes);
     } catch (e) {
         // A flaky network should cost one cycle, not the plugin. Catching here
         // keeps that true regardless of how the host treats a rejected tick();

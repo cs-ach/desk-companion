@@ -26,26 +26,6 @@ fn app(id: &str, name: &str, glyph: &str, fill: u32, fault: bool) -> AppEntry {
     }
 }
 
-fn wallpaper_options(dir: &Path) -> Vec<(String, PathBuf)> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-
-    let mut found: Vec<(String, PathBuf)> = entries
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png" || x == "jpg"))
-        .filter_map(|p| {
-            p.file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| (s.to_string(), p.clone()))
-        })
-        .collect();
-
-    found.sort_by(|a, b| a.0.cmp(&b.0));
-    found
-}
-
 fn dock(id: &str, glyph: &str, fault: bool) -> DockItem {
     let icon = PathBuf::from(PLUGINS).join(id).join("icon.png");
 
@@ -114,7 +94,7 @@ fn main() -> Result<()> {
         app("http-demo", "HTTP Demo", "globe", BLUE, false),
     ]);
 
-    let wallpapers = wallpaper_options(&pi::screen::wallpapers_dir());
+    let wallpapers = pi::wallpaper::options(&pi::screen::wallpapers_dir());
     screen.set_wallpaper_options(&wallpapers);
 
     if let Some(i) = args.iter().position(|a| a == "--wallpaper") {

@@ -142,8 +142,29 @@ impl<'a> Session<'a> {
                 self.request_or_ready(plan)?;
             }
 
+            HostToPi::Ready => {
+                println!("Host Ready starting all host!");
+                self.pi.start_all_host();
+            }
+
+            HostToPi::State { module_id, payload } => {
+                let plugin = match self.pi.running.get_plugin(&module_id) {
+                    Some(plugin) => plugin,
+                    None => {
+                        return Ok(());
+                    }
+                };
+
+                let call = plugin.call("onState".to_owned(), payload.clone());
+                if !call {
+                    eprintln!("Unable to call onState for {module_id} with payload {payload}")
+                }
+            }
+
             other => println!("link: {other:?}"),
         }
+
+
 
         Ok(())
     }
