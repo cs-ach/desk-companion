@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use jsrt::rquickjs::{self, Ctx, Exception, Function, IntoJs, Object, Value, function::{Async, Opt}};
-use jsrt::describe;
+use rquickjs::{Ctx, Exception, Function, IntoJs, Object, Value, function::{Async, Opt}};
 use plugin::Plugin;
 use reqwest::Method;
 
+use crate::describe;
 use crate::http::{FetchOptions, HttpClient, HttpResponse};
 
 pub fn fetch<'js>(ctx: &Ctx<'js>, _plugin: &Plugin, http_client: HttpClient) -> rquickjs::Result<Value<'js>> {

@@ -1,5 +1,4 @@
 mod desk;
-mod http;
 mod link;
 
 use std::collections::HashMap;
@@ -73,7 +72,7 @@ impl Host {
 
     fn spawn(&self, plugin: &Arc<Plugin>) -> RunningPlugin {
         let logger = Arc::new(Logger::new(&plugin.manifest.id, &plugin.logs_dir()));
-        let client = http::HttpClient::new();
+        let client = jsrt::HttpClient::new();
         let state_tx = self.state_tx.clone();
         let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -91,7 +90,7 @@ impl Host {
             },
             RustFunction {
                 name: "fetch",
-                build: Box::new(move |ctx, plugin| desk::fetch(ctx, plugin, client.clone())),
+                build: Box::new(move |ctx, plugin| globals::fetch(ctx, plugin, client.clone())),
             },
             RustFunction {
                 name: "sendState",

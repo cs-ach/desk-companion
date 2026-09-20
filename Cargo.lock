@@ -1673,7 +1673,6 @@ dependencies = [
  "jsrt",
  "plugin",
  "protocol",
- "reqwest",
  "serde",
  "serde_json",
  "serialport",
@@ -2455,6 +2454,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "plugin",
+ "reqwest",
  "rquickjs",
  "serde_json",
  "thiserror 2.0.20",

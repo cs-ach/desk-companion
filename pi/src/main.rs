@@ -103,6 +103,7 @@ impl Pi {
     fn spawn(&self, plugin: &Arc<Plugin>) -> RunningPlugin {
         let logger = Arc::new(Logger::new(&plugin.manifest.id, &plugin.logs_dir()));
         let shutdown = Arc::new(AtomicBool::new(false));
+        let client = jsrt::HttpClient::new();
 
         let functions = vec![
             RustFunction {
@@ -115,6 +116,10 @@ impl Pi {
             RustFunction {
                 name: "config",
                 build: Box::new(|ctx, plugin| globals::config(ctx, plugin.config.device_values())),
+            },
+            RustFunction {
+                name: "fetch",
+                build: Box::new(move |ctx, plugin| globals::fetch(ctx, plugin, client.clone())),
             },
         ];
 
