@@ -15,7 +15,8 @@ use serialport::{ClearBuffer, SerialPort};
 
 use crate::Host;
 
-pub type StateUpdate = (String, serde_json::Value);
+/// (module_id, name, payload)
+pub type StateUpdate = (String, String, serde_json::Value);
 pub type StateSender = std::sync::mpsc::Sender<StateUpdate>;
 pub type StateReceiver = std::sync::mpsc::Receiver<StateUpdate>;
 
@@ -60,7 +61,7 @@ impl<'a> Session<'a> {
 
             loop {
                 match self.host.state_rx.try_recv() {
-                    Ok((module_id, payload)) => self.send_state(module_id, payload)?,
+                    Ok((module_id, name, payload)) => self.send_state(module_id, name, payload)?,
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => break,
                 }
@@ -154,14 +155,27 @@ impl<'a> Session<'a> {
                 println!("link: heartbeat");
             }
 
+            PiToHost::Action { id: _, module_id, name, payload } => {
+                let Some(plugin) = self.host.running.as_ref().and_then(|r| r.get_plugin(&module_id)) else {
+                    eprintln!("action {name}: {module_id} is not running");
+                    return Ok(());
+                };
+
+                let call = plugin.call("onAction".to_owned(), name.clone(), payload.clone());
+                if !call {
+                    eprintln!("Unable to call onAction {name} for {module_id} with payload {payload}")
+                }
+
+            }
+
             other => println!("link: {other:?}"),
         }
 
         Ok(())
     }
 
-    pub fn send_state(&mut self, module_id: String, payload: serde_json::Value) -> Result<()> {
-        Ok(write_frame(&mut self.port, &HostToPi::State { module_id, payload })?)
+    pub fn send_state(&mut self, module_id: String, name: String, payload: serde_json::Value) -> Result<()> {
+        Ok(write_frame(&mut self.port, &HostToPi::State { module_id, name, payload })?)
     }
 
     fn push_file(&mut self, device_path: &str, bytes: &[u8]) -> Result<()> {

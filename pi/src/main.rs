@@ -11,6 +11,8 @@ use std::path::Path;
 use plugin::{FileManifest, Plugin, SyncPlan};
 use protocol::FileEntry;
 
+use crate::link::{ActionReceiver, ActionSender};
+
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 const DOCK_PLUGINS: usize = 3;
 const GEOMETRY_POLL: std::time::Duration = std::time::Duration::from_secs(1);
@@ -20,6 +22,8 @@ struct Pi {
     plugins: Vec<Arc<Plugin>>,
     running: Running,
     screen: Option<ScreenHandle>,
+    action_tx: ActionSender,
+    action_rx: ActionReceiver,
 }
 
 impl Pi {
@@ -29,11 +33,15 @@ impl Pi {
             Some(arg) => std::path::PathBuf::from(arg),
             None => plugin::user_plugins_dir().context("no application data directory")?,
         };
+        let (action_tx, action_rx) = std::sync::mpsc::channel();
+
         Ok(Self {
             dir,
             plugins: Vec::new(),
             running: Running::default(),
             screen: None,
+            action_tx,
+            action_rx,
         })
     }
 
@@ -104,6 +112,7 @@ impl Pi {
         let logger = Arc::new(Logger::new(&plugin.manifest.id, &plugin.logs_dir()));
         let shutdown = Arc::new(AtomicBool::new(false));
         let client = jsrt::HttpClient::new();
+        let action_tx = self.action_tx.clone();
 
         let functions = vec![
             RustFunction {
@@ -120,6 +129,10 @@ impl Pi {
             RustFunction {
                 name: "fetch",
                 build: Box::new(move |ctx, plugin| globals::fetch(ctx, plugin, client.clone())),
+            },
+            RustFunction {
+                name: "sendAction",
+                build: Box::new(move |ctx, plugin| desk::send_action(ctx, plugin, action_tx.clone())),
             },
         ];
 

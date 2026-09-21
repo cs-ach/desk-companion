@@ -1,4 +1,3 @@
-use jsrt::rquickjs::{FromJs, IntoJs};
 use plugin::Plugin;
 use jsrt::Json;
 use jsrt::rquickjs::{self, Ctx, Function, Value, function::{Async, Opt}};
@@ -12,7 +11,7 @@ pub fn send_state<'js>(
 ) -> rquickjs::Result<Value<'js>> {
     let module_id = plugin.manifest.id.clone();
 
-    let function = Function::new(ctx.clone(), Async(move |ctx: Ctx<'js>, state: Opt<Json>| {
+    let function = Function::new(ctx.clone(), Async(move |ctx: Ctx<'js>, name: String, state: Opt<Json>| {
         let module_id = module_id.clone();
         let state_tx = state_tx.clone();
 
@@ -21,7 +20,7 @@ pub fn send_state<'js>(
                 return Ok(());
             };
 
-            let _ = state_tx.send((module_id, json_state.0));
+            let _ = state_tx.send((module_id, name, json_state.0));
 
             Ok::<_, rquickjs::Error>(())
         }

@@ -11,6 +11,7 @@ pub enum HostToPi {
 
     State {
         module_id: String,
+        name: String,
         payload: Value,
     },
 
@@ -64,7 +65,7 @@ pub enum PiToHost {
         id: u32,
         module_id: String,
         name: String,
-        value: Option<Value>,
+        payload: Value,
     },
 
     Heartbeat,

@@ -1,9 +1,0 @@
-{
-  "id": "countdown",
-  "name": "Countdown",
-  "widgets": [{ "name": "days_left", "size": "2x2" }],
-  "config": [
-    { "key": "target", "type": "string", "label": "Target date", "default": "2027-01-01" },
-    { "key": "label", "type": "string", "label": "Label", "default": "New Year" }
-  ]
-}

@@ -21,6 +21,7 @@ slint-interpreter = { version = "1", default-features = false, features = ["comp
 i-slint-core = "=1.17.1"
 # blocks on the interpreter's async compile step; there is no runtime here
 spin_on = "0.1"
+rand = "0.10.2"
 fontique = { version = "0.10", default-features = false, features = ["fontconfig-dlopen"], optional = true }
 
 [features]

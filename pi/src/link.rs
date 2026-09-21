@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::TryRecvError;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,11 @@ use protocol::{FileEntry, HostToPi, PROTOCOL_VERSION, PiToHost};
 use serialport::{ClearBuffer, SerialPort};
 
 use crate::Pi;
+
+pub type ActionUpdate = (String, String, serde_json::Value);
+pub type ActionSender = std::sync::mpsc::Sender<ActionUpdate>;
+pub type ActionReceiver = std::sync::mpsc::Receiver<ActionUpdate>;
+
 
 pub const GADGET_SERIAL: &str = "/dev/ttyGS0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -66,6 +72,14 @@ impl<'a> Session<'a> {
 
     fn run(&mut self) -> Result<&'static str> {
         self.announce().context("sending hello")?;
+
+        loop {
+            match self.pi.action_rx.try_recv() {
+                Ok((module_id, name, payload)) => self.send_action(module_id, name, payload)?,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => break,
+            }
+        }
 
         loop {
             if self.greeted && self.last_heartbeat.elapsed() >= ANNOUNCE_INTERVAL {
@@ -147,7 +161,7 @@ impl<'a> Session<'a> {
                 self.pi.start_all_host();
             }
 
-            HostToPi::State { module_id, payload } => {
+            HostToPi::State { module_id, name, payload } => {
                 let plugin = match self.pi.running.get_plugin(&module_id) {
                     Some(plugin) => plugin,
                     None => {
@@ -155,9 +169,9 @@ impl<'a> Session<'a> {
                     }
                 };
 
-                let call = plugin.call("onState".to_owned(), payload.clone());
+                let call = plugin.call("onState".to_owned(), name.clone(), payload.clone());
                 if !call {
-                    eprintln!("Unable to call onState for {module_id} with payload {payload}")
+                    eprintln!("Unable to call onState {name} for {module_id} with payload {payload}")
                 }
             }
 
@@ -294,6 +308,11 @@ impl<'a> Session<'a> {
     fn send_heartbeat(&mut self) -> Result<()> {
         Ok(write_frame(&mut self.port, &PiToHost::Heartbeat)?)
     }
+
+    fn send_action(&mut self, module_id: String, name: String, payload: serde_json::Value) -> Result<()> {
+        Ok(write_frame(&mut self.port, &PiToHost::Action { id: rand::random(), module_id, name, payload })?)
+    }
+
 }
 
 fn install(dest: &Path, bytes: &[u8]) -> Result<()> {

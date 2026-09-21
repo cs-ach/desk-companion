@@ -3351,6 +3351,7 @@ dependencies = [
  "jsrt",
  "plugin",
  "protocol",
+ "rand",
  "serde",
  "serde_json",
  "serialport",

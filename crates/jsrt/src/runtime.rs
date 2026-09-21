@@ -12,7 +12,9 @@ use crate::error::{Error, Result};
 use crate::json::Json;
 use crate::logger::Logger;
 
-pub type Call = (String, serde_json::Value);
+/// (function, name, payload) -- the hook to invoke, and the two
+/// arguments every hook takes.
+pub type Call = (String, String, serde_json::Value);
 pub type CallSender = tokio::sync::mpsc::UnboundedSender<Call>;
 pub type CallReceiver = tokio::sync::mpsc::UnboundedReceiver<Call>;
 
@@ -42,8 +44,8 @@ impl RunningPlugin {
         self.join(id);
     }
 
-    pub fn call(&self, function: String, payload: serde_json::Value) -> bool {
-        self.calls.send((function, payload)).is_ok()
+    pub fn call(&self, function: String, name: String, payload: serde_json::Value) -> bool {
+        self.calls.send((function, name, payload)).is_ok()
     }
 }
 
@@ -279,8 +281,8 @@ impl Sandbox {
                     }
 
                     tokio::select! {
-                        Some((function, payload)) = call_rx.recv() => {
-                            match sandbox.call_global(&function, (Json(payload),)).await {
+                        Some((function, name, payload)) = call_rx.recv() => {
+                            match sandbox.call_global(&function, (name, Json(payload))).await {
                                 Ok(true) => {}
                                 Ok(false) => sandbox.logger.warn(&format!("{function} not defined")),
                                 Err(e) => sandbox.logger.error(&format!("{function} failed: {e}")),
