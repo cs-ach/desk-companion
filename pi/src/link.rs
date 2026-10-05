@@ -19,10 +19,21 @@ pub type ActionUpdate = (String, String, serde_json::Value);
 pub type ActionSender = std::sync::mpsc::Sender<ActionUpdate>;
 pub type ActionReceiver = std::sync::mpsc::Receiver<ActionUpdate>;
 
+pub type AuthSender = std::sync::mpsc::Sender<String>;
+pub type AuthReceiver = std::sync::mpsc::Receiver<String>;
+
+pub type TapUpdate = (String, String);
+pub type TapSender = std::sync::mpsc::Sender<TapUpdate>;
+pub type TapReceiver = std::sync::mpsc::Receiver<TapUpdate>;
+
+pub type RenderUpdate = (String, serde_json::Value);
+pub type RenderSender = std::sync::mpsc::Sender<RenderUpdate>;
+pub type RenderReceiver = std::sync::mpsc::Receiver<RenderUpdate>;
 
 pub const GADGET_SERIAL: &str = "/dev/ttyGS0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
+const IDLE_POLL: Duration = Duration::from_millis(20);
 const ANNOUNCE_INTERVAL: Duration = Duration::from_secs(10);
 const MAX_SYNC_ROUNDS: u32 = 3;
 
@@ -74,17 +85,16 @@ impl<'a> Session<'a> {
         self.announce().context("sending hello")?;
 
         loop {
-            match self.pi.action_rx.try_recv() {
-                Ok((module_id, name, payload)) => self.send_action(module_id, name, payload)?,
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => break,
-            }
-        }
+            self.pump()?;
 
-        loop {
             if self.greeted && self.last_heartbeat.elapsed() >= ANNOUNCE_INTERVAL {
                 self.send_heartbeat()?;
                 self.last_heartbeat = Instant::now();
+            }
+
+            if self.port.bytes_to_read().unwrap_or(1) == 0 {
+                sleep(IDLE_POLL);
+                continue;
             }
 
             match read_frame::<_, HostToPi>(&mut self.port) {
@@ -170,15 +180,18 @@ impl<'a> Session<'a> {
                 };
 
                 let call = plugin.call("onState".to_owned(), name.clone(), payload.clone());
+
                 if !call {
                     eprintln!("Unable to call onState {name} for {module_id} with payload {payload}")
                 }
             }
 
+            HostToPi::Auth { module_id, needs_auth } => {
+                self.pi.set_auth_state(module_id, needs_auth);
+            }
+
             other => println!("link: {other:?}"),
         }
-
-
 
         Ok(())
     }
@@ -210,7 +223,6 @@ impl<'a> Session<'a> {
                 return;
             }
         };
-        println!("{}", data.to_string());
 
         let starting = seq == 0;
         let continuing = self
@@ -309,6 +321,32 @@ impl<'a> Session<'a> {
         Ok(write_frame(&mut self.port, &PiToHost::Heartbeat)?)
     }
 
+    fn pump(&mut self) -> Result<()> {
+        drain_taps(self.pi);
+        drain_renders(self.pi);
+
+        loop {
+            match self.pi.action_rx.try_recv() {
+                Ok((module_id, name, payload)) => {
+                    self.send_action(module_id, name, payload)?
+                }
+                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+            }
+        }
+
+        loop {
+            match self.pi.auth_rx.try_recv() {
+                Ok(module_id) => {
+                    println!("link: asking the host to authorize {module_id}");
+                    write_frame(&mut self.port, &PiToHost::Authorize { module_id })?;
+                }
+                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+            }
+        }
+
+        Ok(())
+    }
+
     fn send_action(&mut self, module_id: String, name: String, payload: serde_json::Value) -> Result<()> {
         Ok(write_frame(&mut self.port, &PiToHost::Action { id: rand::random(), module_id, name, payload })?)
     }
@@ -353,6 +391,24 @@ fn remove_extra(extra: &[String], local: &FileManifest) {
     }
 }
 
+fn drain_taps(pi: &mut Pi) {
+    loop {
+        match pi.tap_rx.try_recv() {
+            Ok((kind, target)) => pi.tap(&kind, &target),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => return,
+        }
+    }
+}
+
+fn drain_renders(pi: &mut Pi) {
+    loop {
+        match pi.render_rx.try_recv() {
+            Ok((module_id, payload)) => pi.render(module_id, payload),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => return,
+        }
+    }
+}
+
 pub fn listen(pi: &mut Pi) -> ! {
     loop {
         match Session::open(pi).and_then(|mut s| s.run()) {
@@ -361,6 +417,18 @@ pub fn listen(pi: &mut Pi) -> ! {
         }
 
         pi.stop_all_host();
-        sleep(POLL_INTERVAL);
+        pi.clear_auth_states();
+
+        let until = Instant::now() + POLL_INTERVAL;
+        while Instant::now() < until {
+            drain_taps(pi);
+            drain_renders(pi);
+
+            while let Ok(module_id) = pi.auth_rx.try_recv() {
+                eprintln!("authorize {module_id}: the host is not connected");
+            }
+
+            sleep(IDLE_POLL);
+        }
     }
 }
