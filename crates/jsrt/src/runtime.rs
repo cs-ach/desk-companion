@@ -12,8 +12,6 @@ use crate::error::{Error, Result};
 use crate::json::Json;
 use crate::logger::Logger;
 
-/// (function, name, payload) -- the hook to invoke, and the two
-/// arguments every hook takes.
 pub type Call = (String, String, serde_json::Value);
 pub type CallSender = tokio::sync::mpsc::UnboundedSender<Call>;
 pub type CallReceiver = tokio::sync::mpsc::UnboundedReceiver<Call>;
@@ -85,8 +83,6 @@ impl Running {
         self.plugins.get(module_id)
     }
 
-
-
     pub fn stop_all(self) {
         for running in self.plugins.values() {
             running.signal();
@@ -101,6 +97,7 @@ impl Running {
 pub enum Entry {
     Host,
     Pi,
+    Auth,
 }
 
 impl Entry {
@@ -108,6 +105,7 @@ impl Entry {
         match self {
             Entry::Host => plugin.host_js(),
             Entry::Pi => Some(plugin.pi_js()),
+            Entry::Auth => plugin.auth_js(),
         }
     }
 
@@ -115,6 +113,7 @@ impl Entry {
         match self {
             Entry::Host => "host.js",
             Entry::Pi => "pi.js",
+            Entry::Auth => "auth.js",
         }
     }
 }
@@ -233,16 +232,46 @@ impl Sandbox {
         self.shutdown_handler.store(true, Ordering::Relaxed);
     }
 
+    pub fn run_once(
+        plugin: Arc<Plugin>,
+        memory_limit: usize,
+        functions: Vec<RustFunction>,
+        logger: Arc<Logger>,
+        entry: Entry,
+        function: &str,
+    ) -> Result<bool> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| rquickjs::Error::Unknown)?;
+
+        runtime.block_on(async move {
+            let shutdown = Arc::new(AtomicBool::new(false));
+            let mut sandbox =
+                Sandbox::new(plugin, memory_limit, functions, logger, shutdown, entry);
+
+            sandbox.build().await?;
+            sandbox.load_entry().await?;
+
+            let called = sandbox.call_global(function, ()).await?;
+            sandbox.run_until_idle().await;
+            Ok(called)
+        })
+    }
+
     pub fn start_thread(plugin: Arc<Plugin>, memory_limit: usize, functions: Vec<RustFunction>, logger: Arc<Logger>, shutdown_handler: Arc<AtomicBool>, entry: Entry) -> (CallSender, JoinHandle<()>) {
         let (calls, mut call_rx): (CallSender, CallReceiver) = tokio::sync::mpsc::unbounded_channel();
 
         let handle = std::thread::spawn(move || {
-            let mut tick_interval = DEFAULT_TICK_INTERVAL;
+            let configured = match entry {
+                Entry::Host => plugin.manifest.host_tick_interval_ms,
+                Entry::Pi => plugin.manifest.pi_tick_interval_ms,
+                Entry::Auth => None,
+            };
 
-            if let Some(plugin_interval) = plugin.manifest.tick_interval_ms {
-                tick_interval = Duration::from_millis(plugin_interval.into());
-            }
-            
+            let tick_interval = configured
+                .map(|ms| Duration::from_millis(ms.into()))
+                .unwrap_or(DEFAULT_TICK_INTERVAL);
 
             let tokio_rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(rt) => rt,
@@ -255,7 +284,6 @@ impl Sandbox {
             tokio_rt.block_on(async move {
                 let mut sandbox = Sandbox::new(plugin, memory_limit, functions, logger, shutdown_handler, entry);
                 let mut interval = tokio::time::interval(tick_interval.max(MIN_TICK_INTERVAL));
-
 
                 if let Err(e) = sandbox.build().await {
                     sandbox.logger.error(&format!("build failed: {e}"));
