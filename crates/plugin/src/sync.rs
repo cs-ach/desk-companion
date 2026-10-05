@@ -10,7 +10,6 @@ use sha2::{Digest, Sha256};
 use crate::Plugin;
 
 pub(crate) const SRC_DIR: &str = "src";
-pub(crate) const PAGES_DIR: &str = "pages";
 pub(crate) const WIDGETS_DIR: &str = "widgets";
 pub(crate) const PUBLIC_DIR: &str = "public";
 pub(crate) const DEFAULT_PAGE: &str = "app";
@@ -48,13 +47,24 @@ pub fn safe_join(root: &Path, device_path: &str) -> Option<PathBuf> {
     (depth >= 2).then_some(out)
 }
 
+const PLUGIN_FILES: &[(&str, bool)] = &[
+    ("manifest.json", true),
+    ("pi.js", true),
+    ("icon.png", false),
+];
+
 pub fn device_manifest<'a>(plugins: impl IntoIterator<Item = &'a Plugin>) -> Result<FileManifest> {
     let mut manifest = FileManifest::default();
 
     for p in plugins {
         let id = &p.manifest.id;
-        push_file(&mut manifest, &p.root, &p.root.join("manifest.json"), id)?;
-        push_file(&mut manifest, &p.root, &p.pi_js(), id)?;
+        for (name, required) in PLUGIN_FILES {
+            let path = p.root.join(name);
+            if *required || path.is_file() {
+                push_file(&mut manifest, &p.root, &path, id)?;
+            }
+        }
+
         push_dir(&mut manifest, &p.root, &p.root.join(SRC_DIR), id)?;
     }
 
@@ -81,8 +91,9 @@ pub fn local_manifest(dir: &Path) -> Result<FileManifest> {
         };
         let id = id.to_owned();
 
-        push_optional_file(&mut manifest, &root, &root.join("manifest.json"), &id)?;
-        push_optional_file(&mut manifest, &root, &root.join("pi.js"), &id)?;
+        for (name, _) in PLUGIN_FILES {
+            push_optional_file(&mut manifest, &root, &root.join(name), &id)?;
+        }
 
         let src = root.join(SRC_DIR);
         if src.is_dir() {
@@ -199,8 +210,8 @@ mod tests {
     fn safe_join_keeps_plain_paths() {
         let root = Path::new("/plugins");
         assert_eq!(
-            safe_join(root, "quake/src/pages/app.slint"),
-            Some(PathBuf::from("/plugins/quake/src/pages/app.slint"))
+            safe_join(root, "quake/src/app.slint"),
+            Some(PathBuf::from("/plugins/quake/src/app.slint"))
         );
     }
 
@@ -216,18 +227,56 @@ mod tests {
     }
 
     #[test]
+    fn the_host_offer_and_the_device_inventory_agree() {
+        let dir = std::env::temp_dir()
+            .join(format!("plugin-sync-{}-agree", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let root = dir.join("spotify");
+        fs::create_dir_all(root.join("src/widgets")).unwrap();
+        fs::write(root.join("manifest.json"), r#"{"id":"spotify","name":"S"}"#).unwrap();
+        fs::write(root.join("pi.js"), "// pi").unwrap();
+        fs::write(root.join("icon.png"), b"\x89PNG fake").unwrap();
+        fs::write(root.join("src/app.slint"), "// page").unwrap();
+        fs::write(root.join("src/widgets/now.slint"), "// widget").unwrap();
+
+        let plugin = Plugin {
+            manifest: serde_json::from_str(r#"{"id":"spotify","name":"S"}"#).unwrap(),
+            root: root.clone(),
+            config: Default::default(),
+            secrets: Default::default(),
+        };
+
+        let offered = device_manifest([&plugin]).unwrap();
+        let held = local_manifest(&dir).unwrap();
+
+        let offered_paths: Vec<&str> = offered.files.iter().map(|f| f.path.as_str()).collect();
+        let held_paths: Vec<&str> = held.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(offered_paths, held_paths, "the two sides list different files");
+
+        assert!(
+            offered_paths.contains(&"spotify/icon.png"),
+            "icon.png is not offered: {offered_paths:?}"
+        );
+
+        let plan = sync_plan(&offered.files, &held.files);
+        assert!(plan.needed.is_empty(), "still wanted {:?}", plan.needed);
+        assert!(plan.extra.is_empty(), "wanted to delete {:?}", plan.extra);
+    }
+
+    #[test]
     fn identical_sides_need_nothing() {
-        let files = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
+        let files = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
         assert!(sync_plan(&files, &files).is_empty());
     }
 
     #[test]
     fn a_missing_file_is_needed() {
-        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
+        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
         let local = vec![entry("quake/pi.js", "aaa")];
 
         let plan = sync_plan(&desired, &local);
-        assert_eq!(plan.needed, ["quake/src/pages/app.slint"]);
+        assert_eq!(plan.needed, ["quake/src/app.slint"]);
         assert!(plan.extra.is_empty());
     }
 
@@ -263,10 +312,10 @@ mod tests {
 
     #[test]
     fn a_bare_device_needs_everything() {
-        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/pages/app.slint", "bbb")];
+        let desired = vec![entry("quake/pi.js", "aaa"), entry("quake/src/app.slint", "bbb")];
 
         let plan = sync_plan(&desired, &[]);
-        assert_eq!(plan.needed, ["quake/pi.js", "quake/src/pages/app.slint"]);
+        assert_eq!(plan.needed, ["quake/pi.js", "quake/src/app.slint"]);
         assert!(plan.extra.is_empty());
     }
 }

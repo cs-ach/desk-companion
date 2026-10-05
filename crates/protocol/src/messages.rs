@@ -20,6 +20,11 @@ pub enum HostToPi {
         values: Value,
     },
 
+    Auth {
+        module_id: String,
+        needs_auth: bool,
+    },
+
     Heartbeat,
 
     SyncManifest {
@@ -66,6 +71,10 @@ pub enum PiToHost {
         module_id: String,
         name: String,
         payload: Value,
+    },
+
+    Authorize {
+        module_id: String,
     },
 
     Heartbeat,

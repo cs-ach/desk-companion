@@ -17,3 +17,4 @@ pub use sync::{
 pub fn user_plugins_dir() -> Option<PathBuf> {
     Some(dirs::data_dir()?.join("desk").join("plugins"))
 }
+

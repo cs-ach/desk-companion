@@ -2,7 +2,7 @@ use std::{fs, io};
 use std::path::{Path, PathBuf};
 
 use crate::config::PluginConfig;
-use crate::sync::{DEFAULT_PAGE, PAGES_DIR, PUBLIC_DIR, SRC_DIR, WIDGETS_DIR};
+use crate::sync::{DEFAULT_PAGE, PUBLIC_DIR, SRC_DIR, WIDGETS_DIR};
 use crate::manifest::Manifest;
 use crate::secrets::Secrets;
 
@@ -29,6 +29,11 @@ impl Plugin {
         self.root.join("logs")
     }
 
+    pub fn auth_js(&self) -> Option<PathBuf> {
+        let path = self.root.join("auth.js");
+        path.is_file().then_some(path)
+    }
+
     pub fn host_js(&self) -> Option<PathBuf> {
         self.manifest
             .requires_host
@@ -40,7 +45,7 @@ impl Plugin {
     }
 
     pub fn pages_dir(&self) -> PathBuf {
-        self.src_dir().join(PAGES_DIR)
+        self.src_dir()
     }
 
     pub fn widgets_dir(&self) -> PathBuf {
@@ -202,10 +207,13 @@ fn load(root: &Path, expect_host_js: bool) -> Result<Plugin, DiscoveryError> {
         return Err(invalid(format!("missing required {SRC_DIR}/")));
     }
 
-    let pages = root.join(SRC_DIR).join(PAGES_DIR);
-    if !pages.join(format!("{DEFAULT_PAGE}.slint")).is_file() {
+    if !root
+        .join(SRC_DIR)
+        .join(format!("{DEFAULT_PAGE}.slint"))
+        .is_file()
+    {
         return Err(invalid(format!(
-            "missing required {SRC_DIR}/{PAGES_DIR}/{DEFAULT_PAGE}.slint (the plugin's default page)"
+            "missing required {SRC_DIR}/{DEFAULT_PAGE}.slint (the plugin's default page)"
         )));
     }
 
@@ -249,8 +257,8 @@ mod tests {
 
     fn scaffold(dir: &Path, id: &str, manifest: &str) -> PathBuf {
         let root = dir.join(id);
-        fs::create_dir_all(root.join("src/pages")).unwrap();
-        fs::write(root.join("src/pages/app.slint"), "").unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/app.slint"), "").unwrap();
         fs::write(root.join("pi.js"), "").unwrap();
         fs::write(root.join("manifest.json"), manifest).unwrap();
         root
@@ -285,7 +293,7 @@ mod tests {
     fn rejects_a_plugin_without_a_page() {
         let dir = tempdir("rejects_a_plugin_without_a_page");
         let root = scaffold(&dir, "broken", r#"{"id":"broken","name":"B"}"#);
-        fs::remove_file(root.join("src/pages/app.slint")).unwrap();
+        fs::remove_file(root.join("src/app.slint")).unwrap();
 
         let (plugins, errors) = discover(&dir).unwrap();
         assert!(plugins.is_empty());

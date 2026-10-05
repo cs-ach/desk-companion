@@ -15,21 +15,25 @@ use serialport::{ClearBuffer, SerialPort};
 
 use crate::Host;
 
-/// (module_id, name, payload)
 pub type StateUpdate = (String, String, serde_json::Value);
 pub type StateSender = std::sync::mpsc::Sender<StateUpdate>;
 pub type StateReceiver = std::sync::mpsc::Receiver<StateUpdate>;
+
+pub type AuthDoneSender = std::sync::mpsc::Sender<String>;
+pub type AuthDoneReceiver = std::sync::mpsc::Receiver<String>;
 
 pub const GADGET_SERIAL: &str = "/dev/ttyACM0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const NOT_ALIVE_LIMIT: Duration = Duration::from_secs(30);
+const IDLE_POLL: Duration = Duration::from_millis(20);
 
 pub struct Session<'a> {
     host: &'a mut Host,
     port: Box<dyn SerialPort>,
     last_alive: Instant,
     offered: Option<FileManifest>,
+    pending_auth_states: bool,
 }
 
 impl<'a> Session<'a> {
@@ -49,6 +53,7 @@ impl<'a> Session<'a> {
             port,
             last_alive: Instant::now(),
             offered: None,
+            pending_auth_states: false,
         })
     }
 
@@ -65,6 +70,29 @@ impl<'a> Session<'a> {
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => break,
                 }
+            }
+
+            if self.pending_auth_states {
+                self.pending_auth_states = false;
+                self.send_auth_states()?;
+            }
+
+            loop {
+                match self.host.auth_done_rx.try_recv() {
+                    Ok(module_id) => {
+                        match self.host.reload(&module_id) {
+                            Ok(()) => println!("link: reloaded {module_id} with its new credential"),
+                            Err(e) => eprintln!("link: could not reload {module_id} ({e:#})"),
+                        }
+                        self.send_auth_states()?;
+                    }
+                    Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+                }
+            }
+
+            if self.port.bytes_to_read().unwrap_or(1) == 0 {
+                sleep(IDLE_POLL);
+                continue;
             }
 
             match read_frame::<_, PiToHost>(&mut self.port) {
@@ -144,6 +172,7 @@ impl<'a> Session<'a> {
             }
 
             PiToHost::Ready => {
+                self.pending_auth_states = true;
                 println!("link: device reports it is in sync");
                 self.host.start_all();
                 let message = HostToPi::Ready;
@@ -168,7 +197,24 @@ impl<'a> Session<'a> {
 
             }
 
+            PiToHost::Authorize { module_id } => {
+                println!("link: device asked to authorize {module_id}");
+                self.host.authorize(&module_id);
+            }
+
             other => println!("link: {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    fn send_auth_states(&mut self) -> Result<()> {
+        for (module_id, needs_auth) in self.host.auth_states() {
+            write_frame(
+                &mut self.port,
+                &HostToPi::Auth { module_id, needs_auth },
+            )
+            .context("sending an auth state")?;
         }
 
         Ok(())
@@ -223,6 +269,8 @@ pub fn listen(host: &mut Host) -> ! {
             Ok(reason) => println!("link: {reason}"),
             Err(e) => eprintln!("link: {e:#}"),
         }
+
+        host.stop_all();
 
         sleep(POLL_INTERVAL);
     }
