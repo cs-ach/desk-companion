@@ -14,15 +14,21 @@ serde.workspace = true
 serde_json.workspace = true
 serialport = { version = "4.10.1", default-features = false }
 base64 = "0.23.1"
-slint-interpreter = { version = "1", default-features = false, features = ["compat-1-2"] }
+# "internal" exposes ComponentDefinition::create_embedded, which is how a
+# plugin's own .slint is grafted into the shell via ComponentContainer. It is
+# public-but-unsupported API, so the version is pinned exactly alongside
+# i-slint-core -- a routine `cargo update` could otherwise break it.
+slint-interpreter = { version = "=1.18.1", default-features = false, features = ["compat-1-2", "internal"] }
 # Constructing Value::Model / Value::Brush means naming ModelRc and Brush, which
 # slint-interpreter exposes in its public API but does not re-export. Must track
 # slint-interpreter exactly or the types are nominally different.
-i-slint-core = "=1.17.1"
+i-slint-core = "=1.18.1"
+i-slint-common = { version = "=1.18.1", default-features = false, features = ["fontconfig-dlopen"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 # blocks on the interpreter's async compile step; there is no runtime here
 spin_on = "0.1"
 rand = "0.10.2"
-fontique = { version = "0.10", default-features = false, features = ["fontconfig-dlopen"], optional = true }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [features]
 default = ["desktop"]
@@ -33,5 +39,4 @@ desktop = [
 device = [
     "slint-interpreter/backend-linuxkms-noseat",
     "slint-interpreter/renderer-femtovg",
-    "dep:fontique",
 ]
