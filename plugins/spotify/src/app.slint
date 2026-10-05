@@ -1,0 +1,231 @@
+// Spotify -- the plugin's own page.
+//
+// Self-contained on purpose: a plugin is compiled from its own directory and
+// cannot import the shell's tokens, so the material values are repeated here.
+// They match the shell's glass tokens -- if those change, these follow.
+
+component Glyph inherits Rectangle {
+    in property <string> kind;
+    in property <brush> tint: #ffffff;
+    in property <length> stroke: 1.6px;
+    in property <bool> filled: false;
+
+    property <string> commands:
+        root.kind == "spotify" ? "M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"
+      : root.kind == "note" ? "M 9 18 L 9 6 L 19 4 L 19 16 M 6.5 15.5 A 2.5 2.5 0 0 1 6.5 20.5 A 2.5 2.5 0 0 1 6.5 15.5 Z M 16.5 13.5 A 2.5 2.5 0 0 1 16.5 18.5 A 2.5 2.5 0 0 1 16.5 13.5 Z"
+      : root.kind == "play" ? "M 8 4.8 L 19 12 L 8 19.2 Z"
+      : root.kind == "pause" ? "M 6 4.5 L 10 4.5 L 10 19.5 L 6 19.5 Z M 14 4.5 L 18 4.5 L 18 19.5 L 14 19.5 Z"
+      : root.kind == "prev" ? "M 17 5 L 17 19 L 8 12 Z M 5 5 L 7.4 5 L 7.4 19 L 5 19 Z"
+      : root.kind == "next" ? "M 7 5 L 16 12 L 7 19 Z M 16.6 5 L 19 5 L 19 19 L 16.6 19 Z"
+      : "";
+
+    width: 22px;
+    height: 22px;
+
+    if root.commands != "": Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: root.commands;
+        fill: root.filled ? root.tint : transparent;
+        stroke: root.filled ? transparent : root.tint;
+        stroke-width: root.stroke;
+    }
+}
+
+component Control inherits Rectangle {
+    in property <string> glyph;
+    in property <bool> primary: false;
+    in property <length> side: 56px;
+    callback clicked();
+
+    width: root.side;
+    height: root.side;
+    border-radius: root.primary ? 23px : 19px;
+    border-width: root.primary ? 0px : 1px;
+    background: root.primary
+        ? (touch.pressed ? #0A84FFcc : #0A84FF)
+        : (touch.pressed ? #ffffff2e : #ffffff1c);
+    border-color: #ffffff1f;
+    drop-shadow-blur: root.primary ? 22px : 0px;
+    drop-shadow-color: #0A84FF70;
+    drop-shadow-offset-y: root.primary ? 8px : 0px;
+
+    Glyph {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.primary ? 26px : 22px;
+        height: root.primary ? 26px : 22px;
+        kind: root.glyph;
+        tint: #ffffff;
+        filled: true;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component App inherits Window {
+    background: transparent;
+
+    in property <string> headline: "Nothing playing";
+    in property <string> detail;
+    in property <int> elapsed_ms;
+    in property <int> total_ms;
+    in property <bool> advancing;
+    in property <bool> playing;
+
+    in property <image> image;
+    in property <bool> has_image;
+
+    callback activated(string);
+
+    property <int> shown: min(root.elapsed_ms, root.total_ms);
+
+    pure function clock(ms: int) -> string {
+        return "\{Math.floor(ms / 60000)}:\{Math.mod(Math.floor(ms / 1000), 60) < 10 ? "0" : ""}\{Math.mod(Math.floor(ms / 1000), 60)}";
+    }
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #ffffff0f;
+        border-radius: 30px;
+        border-width: 1px;
+        border-color: #ffffff21;
+    }
+
+    HorizontalLayout {
+        width: 100%;
+        height: 100%;
+        padding: 28px;
+        spacing: 28px;
+
+        VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 190px;
+                height: 190px;
+                border-radius: 26px;
+                background: @linear-gradient(145deg, #4DA3FF 0%, #0A5FCC 55%, #073E88 100%);
+                drop-shadow-blur: 34px;
+                drop-shadow-color: #00000061;
+                drop-shadow-offset-y: 14px;
+                clip: true;
+
+                if !root.has_image: Glyph {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 64px;
+                    height: 64px;
+                    kind: "spotify";
+                    tint: #ffffffeb;
+                    filled: true;
+                }
+
+                if root.has_image: Image {
+                    width: 100%;
+                    height: 100%;
+                    source: root.image;
+                    image-fit: cover;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 0px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: "Now playing";
+                font-size: 13px;
+                font-weight: 600;
+                color: #ffffffad;
+            }
+
+            Text {
+                text: root.headline;
+                font-size: 36px;
+                font-weight: 700;
+                letter-spacing: -1.3px;
+                color: #ffffff;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.detail;
+                font-size: 16px;
+                font-weight: 500;
+                color: #ffffffb8;
+                overflow: elide;
+            }
+
+            Rectangle { height: 20px; }
+
+            Rectangle {
+                height: 6px;
+                border-radius: 4px;
+                background: #ffffff2e;
+
+                Rectangle {
+                    x: 0px;
+                    width: root.total_ms > 0
+                        ? parent.width * (root.shown / root.total_ms)
+                        : 0px;
+                    height: 6px;
+                    border-radius: 4px;
+                    background: #ffffff;
+                }
+            }
+
+            Rectangle { height: 7px; }
+
+            HorizontalLayout {
+                Text {
+                    text: root.clock(root.shown);
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #ffffffa3;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    // Counting down, as the design has it.
+                    text: "−" + root.clock(max(0, root.total_ms - root.shown));
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #ffffffa3;
+                }
+            }
+
+            Rectangle { height: 20px; }
+
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: start;
+
+                Control {
+                    glyph: "prev";
+                    clicked => { root.activated("previous"); }
+                }
+
+                Control {
+                    glyph: root.playing ? "pause" : "play";
+                    primary: true;
+                    side: 68px;
+                    clicked => { root.activated(root.playing ? "pause" : "play"); }
+                }
+
+                Control {
+                    glyph: "next";
+                    clicked => { root.activated("next"); }
+                }
+            }
+        }
+    }
+}

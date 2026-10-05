@@ -1,0 +1,32 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "requiresHost": true,
+  "hostTickIntervalMs": 3000,
+  "piTickIntervalMs": 1000,
+  "widgets": [
+    {
+      "name": "nowplaying",
+      "size": "2x1"
+    }
+  ],
+  "capabilities": {
+    "http": [
+      "api.spotify.com",
+      "accounts.spotify.com"
+    ]
+  },
+  "config": [
+    {
+      "key": "clientId",
+      "type": "string",
+      "label": "Spotify client ID"
+    },
+    {
+      "key": "refreshToken",
+      "type": "string",
+      "label": "Spotify refresh token",
+      "secret": true
+    }
+  ]
+}

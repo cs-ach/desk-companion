@@ -1,0 +1,113 @@
+// Spotify -- the 2x1 grid tile.
+//
+// The compact form of the page: art, track, artist, and a progress hairline.
+// No controls -- the tile is one touch target, and tapping it toggles.
+
+// Window and transparent, for the same reason as the page: a non-Window root
+// gets implicitly wrapped in one, and that wrapper's default background paints
+// the tile white.
+export component NowPlaying inherits Window {
+    background: transparent;
+
+    in property <string> headline: "Nothing playing";
+    in property <string> detail;
+    in property <int> elapsed_ms;
+    in property <int> total_ms;
+    in property <bool> advancing;
+    in property <bool> playing;
+
+    property <int> drift: 0;
+    property <int> shown: min(root.elapsed_ms + root.drift, root.total_ms);
+
+    changed elapsed_ms => { root.drift = 0; }
+
+    Timer {
+        interval: 1s;
+        running: root.advancing && root.total_ms > 0;
+        triggered => { root.drift += 1000; }
+    }
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #ffffff14;
+        border-radius: 28px;
+        border-width: 1px;
+        border-color: #ffffff21;
+    }
+
+    HorizontalLayout {
+        width: 100%;
+        height: 100%;
+        padding: 20px;
+        spacing: 16px;
+
+        VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 78px;
+                height: 78px;
+                border-radius: 18px;
+                background: @linear-gradient(145deg, #4DA3FF 0%, #0A5FCC 100%);
+
+                Path {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 28px;
+                    height: 28px;
+                    viewbox-width: 24;
+                    viewbox-height: 24;
+                    commands: "M 9 18 L 9 6 L 19 4 L 19 16 M 6.5 15.5 A 2.5 2.5 0 0 1 6.5 20.5 A 2.5 2.5 0 0 1 6.5 15.5 Z M 16.5 13.5 A 2.5 2.5 0 0 1 16.5 18.5 A 2.5 2.5 0 0 1 16.5 13.5 Z";
+                    stroke: #ffffffeb;
+                    stroke-width: 1.7px;
+                    fill: transparent;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: "Now playing";
+                font-size: 11px;
+                font-weight: 600;
+                color: #ffffff8a;
+            }
+
+            Text {
+                text: root.headline;
+                font-size: 21px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                color: #ffffff;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.detail;
+                font-size: 14px;
+                font-weight: 500;
+                color: #ffffffb8;
+                overflow: elide;
+            }
+
+            if root.total_ms > 0: Rectangle {
+                height: 4px;
+                border-radius: 2px;
+                background: #ffffff2e;
+
+                Rectangle {
+                    x: 0px;
+                    width: parent.width * (root.shown / root.total_ms);
+                    height: 4px;
+                    border-radius: 2px;
+                    background: #ffffff;
+                }
+            }
+        }
+    }
+}
