@@ -4,10 +4,10 @@ import { StatusBar } from "status_bar.slint";
 import { WidgetGrid } from "grid.slint";
 import { Slot } from "slot.slint";
 import { Switcher, AppEntry } from "switcher.slint";
-import { Settings, WallpaperOption } from "settings.slint";
+import { Settings, WallpaperOption, SettingsPlugin } from "settings.slint";
 import { Fault } from "fault.slint";
 
-export { Tokens, DockItem, Slot, AppEntry, WallpaperOption }
+export { Tokens, DockItem, Slot, AppEntry, WallpaperOption, SettingsPlugin }
 
 export component Shell inherits Window {
     in property <[DockItem]> dock_items;
@@ -16,11 +16,19 @@ export component Shell inherits Window {
     in property <string> status_lead: "Desk Companion";
     in property <bool> status_back;
     in property <bool> linked: true;
-    in property <string> status_trailing;
+    in property <string> clock;
 
     in property <[Slot]> slots;
     in property <[AppEntry]> apps;
     in property <[WallpaperOption]> wallpapers;
+    in property <[SettingsPlugin]> settings_plugins;
+    in property <string> device_line;
+
+    // The plugin page is a component the shell compiles from the plugin's own
+    // directory and grafts in here. The id is set alongside the factory so the
+    // container can tell whether the current page is that plugin's.
+    in property <component-factory> plugin_page;
+    in property <string> plugin_page_id;
 
     in property <bool> fault_visible;
     in property <string> fault_body;
@@ -34,6 +42,8 @@ export component Shell inherits Window {
     callback dock_activated(string);
     callback dock_side_changed(bool);
     callback background_changed(string);
+    callback transparency_changed(bool);
+    callback connect_plugin(string);
     callback slot_activated(string);
     callback plugin_picked(string);
     callback back();
@@ -103,13 +113,23 @@ export component Shell inherits Window {
         lead: root.status_lead;
         show_back: root.status_back;
         linked: root.linked;
-        trailing: root.status_trailing;
+        clock: root.clock;
         back => { root.back(); }
     }
 
-    if !root.fault_visible && root.page != "@switcher" && root.page != "@settings": WidgetGrid {
+    if !root.fault_visible && root.page == "@home": WidgetGrid {
         slots: root.slots;
         activated(id) => { root.slot_activated(id); }
+    }
+
+    if !root.fault_visible
+        && root.plugin_page_id != ""
+        && root.page == root.plugin_page_id: ComponentContainer {
+        x: Tokens.content_x;
+        y: Tokens.slot_y;
+        width: Tokens.content_w;
+        height: Tokens.slot_h;
+        component-factory: root.plugin_page;
     }
 
     if !root.fault_visible && root.page == "@switcher": Switcher {
@@ -124,6 +144,10 @@ export component Shell inherits Window {
         dock_right: Tokens.dock_right;
         background_name: Tokens.background;
         wallpapers: root.wallpapers;
+        plugins: root.settings_plugins;
+        device_line: root.device_line;
+        transparency(value) => { root.transparency_changed(value); }
+        connect_plugin(id) => { root.connect_plugin(id); }
         dock_side(right) => {
             Tokens.dock_right = right;
             root.dock_side_changed(right);

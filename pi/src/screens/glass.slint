@@ -56,6 +56,9 @@ export component Panel inherits Rectangle {
 
     border-radius: Tokens.r_panel;
     border-width: 1px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000059;
+    drop-shadow-offset-y: 8px;
     clip: true;
     background: root.sampling
         ? transparent
@@ -97,6 +100,9 @@ export component Menu inherits Rectangle {
 
     border-radius: Tokens.r_panel;
     border-width: 1px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000059;
+    drop-shadow-offset-y: 8px;
     clip: true;
     background: root.sampling ? transparent : (Tokens.has_wallpaper ? #16161b : Tokens.panel);
     border-color: Tokens.glass_border;
@@ -132,6 +138,9 @@ export component Surface inherits Rectangle {
 
     border-radius: Tokens.r_panel;
     border-width: 1px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000059;
+    drop-shadow-offset-y: 8px;
     clip: true;
     background: root.sampling
         ? transparent
@@ -174,7 +183,7 @@ export component Pill inherits Rectangle {
 
     property <bool> sampling: Tokens.has_wallpaper && !Tokens.reduce_transparency;
 
-    height: 26px;
+    height: 28px;
     border-radius: root.height / 2;
     border-width: 1px;
     clip: true;

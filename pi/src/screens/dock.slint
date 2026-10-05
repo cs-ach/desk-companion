@@ -20,10 +20,17 @@ component DockSlot inherits Rectangle {
 
     width: Tokens.dock_slot;
     height: Tokens.dock_slot;
-    border-radius: root.has_icon ? 16px : Tokens.dock_slot / 2;
+    // Squircle, not a circle: the dock rail is a rounded rectangle, and a
+    // round slot inside it fights the outer curve.
+    border-radius: Tokens.r_nested;
     border-width: 1px;
-    background: root.active ? #ffffff29 : (touch.pressed ? #ffffff1a : transparent);
-    border-color: root.active ? #ffffff38 : transparent;
+    background: root.active
+        ? Tokens.control
+        : (touch.pressed ? #ffffff1f : #ffffff1a);
+    border-color: root.active ? transparent : #ffffff1a;
+    drop-shadow-blur: root.active ? 12px : 0px;
+    drop-shadow-color: #0A84FF66;
+    drop-shadow-offset-y: root.active ? 3px : 0px;
     opacity: touch.pressed ? 0.72 : 1.0;
 
     if root.has_icon: Rectangle {
@@ -49,7 +56,7 @@ component DockSlot inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         kind: root.glyph;
-        tint: root.fault ? Tokens.alert : (root.active ? Tokens.text : #ffffff6b);
+        tint: root.fault ? Tokens.alert : (root.active ? Tokens.text : Tokens.text_2);
     }
 
     if root.fault: Rectangle {
@@ -125,7 +132,7 @@ export component Dock inherits Rectangle {
     DockSlot {
         x: (parent.width - self.width) / 2;
         y: 85px + root.items.length * root.pitch;
-        glyph: "sliders";
+        glyph: "gear";
         active: root.active_id == "@settings";
         clicked => { root.activated("@settings"); }
     }

@@ -6,7 +6,7 @@ export component StatusBar inherits Rectangle {
     in property <string> lead;
     in property <bool> show_back;
     in property <bool> linked;
-    in property <string> trailing;
+    in property <string> clock;
     callback back();
 
     x: Tokens.content_x;
@@ -16,11 +16,11 @@ export component StatusBar inherits Rectangle {
 
     if root.show_back: Rectangle {
         x: 0px;
-        width: 34px;
-        height: 34px;
-        border-radius: 17px;
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
         border-width: 1px;
-        background: #ffffff14;
+        background: #ffffff1a;
         border-color: #ffffff1a;
 
         Icon {
@@ -29,8 +29,8 @@ export component StatusBar inherits Rectangle {
             width: 16px;
             height: 16px;
             kind: "back";
-            tint: #ffffffcc;
-            stroke: 2.1px;
+            tint: Tokens.control;
+            stroke: 2.2px;
         }
 
         TouchArea {
@@ -39,26 +39,29 @@ export component StatusBar inherits Rectangle {
     }
 
     Text {
-        x: root.show_back ? 46px : 0px;
+        x: root.show_back ? 40px : 0px;
         y: (parent.height - self.height) / 2;
         text: root.lead;
         font-family: Tokens.face;
-        font-size: root.show_back ? Tokens.headline_size : Tokens.caption_size;
-        font-weight: root.show_back ? 700 : 500;
-        color: root.show_back ? Tokens.text : Tokens.text_2;
+        font-size: root.show_back ? Tokens.headline_size : Tokens.body_size;
+        font-weight: root.show_back ? 700 : 600;
+        color: Tokens.text;
     }
 
+    // One pill, always in the same place on every page: the dot is the link to
+    // the host and the numerals are the clock. The plugin count used to live
+    // here, which spent the most valuable corner of the screen on something
+    // nobody reads twice.
     HorizontalLayout {
         width: 100%;
         height: 100%;
         alignment: end;
-        spacing: 8px;
 
         Pill {
             HorizontalLayout {
-                padding-left: 11px;
-                padding-right: 11px;
-                spacing: 7px;
+                padding-left: 13px;
+                padding-right: 13px;
+                spacing: 8px;
                 alignment: center;
 
                 Dot {
@@ -66,27 +69,11 @@ export component StatusBar inherits Rectangle {
                 }
 
                 Text {
-                    text: root.linked ? "Linked" : "Offline";
+                    text: root.clock;
                     font-family: Tokens.face;
-                    font-size: 12px;
+                    font-size: Tokens.caption_size;
                     font-weight: 600;
-                    color: #ffffffbf;
-                    vertical-alignment: center;
-                }
-            }
-        }
-
-        if root.trailing != "": Pill {
-            HorizontalLayout {
-                padding-left: 11px;
-                padding-right: 11px;
-
-                Text {
-                    text: root.trailing;
-                    font-family: Tokens.face;
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: #ffffffbf;
+                    color: Tokens.text;
                     vertical-alignment: center;
                 }
             }

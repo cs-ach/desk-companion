@@ -1,17 +1,20 @@
 export global Tokens {
-    out property <color> ground: #06070B;
+    out property <color> ground: #080A14;
 
-    out property <brush> bg_ember: @linear-gradient(135deg, #150a0e 0%, #06070b 48%, #0b0a1a 100%);
-    out property <brush> bg_tide: @linear-gradient(135deg, #04141b 0%, #06070b 50%, #081426 100%);
-    out property <brush> bg_violet: @linear-gradient(135deg, #150a20 0%, #06070b 50%, #1c0a18 100%);
-    out property <brush> bg_mono: #06070B;
+    // The grounds stand in for a wallpaper when none is set. They are dark on
+    // purpose: the glass surfaces above them carry the colour, so a bright
+    // ground leaves the panels with nothing to separate them from it.
+    out property <brush> bg_ember: @linear-gradient(160deg, #141022 0%, #0B0A14 52%, #1A0E1C 100%);
+    out property <brush> bg_tide: @linear-gradient(160deg, #0C1328 0%, #080A14 50%, #0A2033 100%);
+    out property <brush> bg_violet: @linear-gradient(160deg, #19102C 0%, #0A0912 50%, #241331 100%);
+    out property <brush> bg_mono: @linear-gradient(160deg, #15171C 0%, #0B0D11 100%);
 
-    in-out property <string> background: "ember";
+    in-out property <string> background: "tide";
     out property <brush> ground_brush:
-        root.background == "tide" ? root.bg_tide
+        root.background == "ember" ? root.bg_ember
         : root.background == "violet" ? root.bg_violet
         : root.background == "mono" ? root.bg_mono
-        : root.bg_ember;
+        : root.bg_tide;
 
     in-out property <bool> dock_right: false;
 
@@ -21,47 +24,63 @@ export global Tokens {
     in-out property <image> backdrop_panel;
     in-out property <image> backdrop_menu;
 
-    out property <color> glass_tint_top: #ffffff0f;
-    out property <color> glass_tint_bottom: #b3b3b30f;
-    out property <color> glass_border: #ffffff14;
-    out property <color> rim_top: #ffffff80;
-    out property <color> rim_hairline: #ffffff1a;
+    // Material. A glass surface is a translucent fill, a hairline edge, and a
+    // bright top rim that reads as a lit edge. Brighter than it looks like it
+    // should be: at 5% white on near-black every panel disappears into the
+    // ground and the whole screen flattens into one grey field.
+    out property <color> glass_tint_top: #ffffff14;
+    out property <color> glass_tint_bottom: #ffffff08;
+    out property <color> glass_border: #ffffff21;
+    out property <color> rim_top: #ffffff3d;
+    out property <color> rim_hairline: #ffffff1f;
     out property <color> rim_bottom: #ffffff0f;
-    out property <color> menu_surface: #16161b;
+    out property <color> menu_surface: #15171Cf2;
     out property <brush> wallpaper_dim: @linear-gradient(180deg,
-        #000000a6 0%, #0000004d 26%, #0000004d 74%, #000000a6 100%);
+        #00000099 0%, #00000040 28%, #00000040 72%, #00000099 100%);
     out property <color> label_scrim: root.has_wallpaper ? #000000a6 : #00000000;
 
-    out property <color> chip_fill: root.has_wallpaper ? #000000a6 : #ffffff12;
-    out property <color> chip_edge: root.has_wallpaper ? #ffffff2e : #ffffff17;
+    out property <color> chip_fill: #ffffff1c;
+    out property <color> chip_edge: #ffffff1f;
 
-    out property <color> panel: #ffffff0d;
-    out property <color> panel_edge: #ffffff17;
-    out property <color> panel_highlight: #ffffff29;
+    out property <color> panel: #ffffff14;
+    out property <color> panel_edge: #ffffff21;
+    out property <color> panel_highlight: #ffffff2e;
     out property <color> selected: #ffffff24;
-    out property <color> selected_edge: #ffffff66;
+    out property <color> selected_edge: #ffffff52;
     out property <color> selected_highlight: #ffffff80;
+    out property <color> separator: #ffffff1a;
 
     out property <color> text: #ffffff;
-    out property <color> text_2: root.has_wallpaper ? #ffffffb8 : #ffffff80;
-    out property <color> text_3: root.has_wallpaper ? #ffffff8f : #ffffff4d;
+    out property <color> text_2: #ffffffb0;
+    out property <color> text_3: #ffffff8a;
 
+    // System colours. Semantic only -- a colour here means a state, never
+    // decoration, so a glance at the screen tells you what needs attention.
     out property <color> alert: #FF453A;
     out property <color> ok: #30D158;
-    out property <color> caution: #FFD426;
-    out property <color> control: #6E5BFF;
+    out property <color> caution: #FF9F0A;
+    out property <color> accent: #BF5AF2;
 
-    out property <string> face: "Manrope";
-    out property <length> display_size: 84px;
-    out property <length> title_size: 23px;
-    out property <length> headline_size: 20px;
+    // The one interactive colour: anything tinted this is something you can
+    // press.
+    out property <color> control: #0A84FF;
+    out property <color> control_edge: #82BEFF42;
+    out property <color> control_fill: #0A84FF38;
+
+    // Figtree is the design target; bundle it with the device image and change
+    // this one line. Noto Sans is the fallback that ships on most Linux and Pi
+    // images, so the shell is legible before the font is installed.
+    out property <string> face: "Noto Sans";
+    out property <length> display_size: 48px;
+    out property <length> title_size: 21px;
+    out property <length> headline_size: 17px;
     out property <length> body_size: 15px;
     out property <length> caption_size: 13px;
-    out property <length> label_size: 11px;
+    out property <length> label_size: 12px;
 
-    out property <length> r_dock: 32px;
-    out property <length> r_panel: 26px;
-    out property <length> r_group: 20px;
+    out property <length> r_dock: 20px;
+    out property <length> r_panel: 28px;
+    out property <length> r_group: 24px;
     out property <length> r_nested: 14px;
 
     // Driven by Shell from the real window size. The defaults are the design
@@ -70,14 +89,16 @@ export global Tokens {
     in-out property <length> screen_w: 800px;
     in-out property <length> screen_h: 480px;
 
+    // One 14px rhythm: every inset, gap and grid gutter is the same number, so
+    // the panels sit on a single spacing grid rather than near-misses.
     out property <length> edge: 14px;
-    out property <length> dock_margin: 12px;
+    out property <length> dock_margin: 14px;
     out property <length> dock_x: root.dock_right
         ? root.screen_w - root.dock_margin - root.dock_w
         : root.dock_margin;
-    out property <length> dock_w: 64px;
+    out property <length> dock_w: 68px;
     out property <length> dock_slot: 48px;
-    out property <length> dock_gap: 8px;
+    out property <length> dock_gap: 7px;
 
     // The dock keeps its fixed width on whichever side it sits; the content
     // column takes whatever is left.
@@ -87,10 +108,10 @@ export global Tokens {
     out property <length> content_w: root.screen_w
         - root.dock_margin - root.dock_w - root.dock_margin - root.edge;
     out property <length> content_h: root.screen_h - 2 * root.edge;
-    out property <length> status_h: 34px;
-    out property <length> gap: 12px;
+    out property <length> status_h: 30px;
+    out property <length> gap: 14px;
 
-    out property <length> slot_y: 60px;
+    out property <length> slot_y: root.edge + root.status_h + root.gap;
     out property <length> slot_h: root.screen_h - root.slot_y - root.edge;
 
     out property <int> grid_cols: 4;
