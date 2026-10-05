@@ -1,18 +1,20 @@
 use std::{collections::HashMap, time::Duration};
+use base64::Engine;
 use reqwest::{Method, header::{HeaderMap, HeaderName, HeaderValue}};
 
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: HashMap<String, String>,
-    pub body: String
+    pub body: String,
+    pub binary: bool,
 }
 
 pub struct FetchOptions {
     pub method: Method,
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<String>,
+    pub binary: bool,
 }
-
 
 #[derive(Clone)]
 pub struct HttpClient {
@@ -25,9 +27,9 @@ impl HttpClient {
         Self { client }
     }
 
-
     pub async fn fetch(&self, url: String, options: FetchOptions) -> Result<HttpResponse, reqwest::Error> {
 
+        let binary = options.binary;
         let header_map = self.header_to_map(options.headers.unwrap_or_default());
 
         let mut req = self.client.request(options.method, url)
@@ -37,13 +39,17 @@ impl HttpClient {
         if let Some(b) = options.body { req = req.body(b) }
 
         let resp = req.send().await?;
-    
-        Ok(HttpResponse {
-            status_code: resp.status().as_u16(),
-            headers: self.map_to_header(resp.headers()),
-            body: resp.text().await?
-        })
 
+        let status_code = resp.status().as_u16();
+        let headers = self.map_to_header(resp.headers());
+
+        let body = if binary {
+            base64::engine::general_purpose::STANDARD.encode(resp.bytes().await?)
+        } else {
+            resp.text().await?
+        };
+
+        Ok(HttpResponse { status_code, headers, body, binary })
     }
 
     fn header_to_map(&self, headers: HashMap<String, String>) -> HeaderMap{

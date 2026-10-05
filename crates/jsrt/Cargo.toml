@@ -8,6 +8,7 @@ license.workspace = true
 rquickjs = { version = "0.13", features = ["futures"] }
 plugin.workspace = true
 reqwest = "0.13.5"
+base64 = "0.23.1"
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 thiserror.workspace = true
