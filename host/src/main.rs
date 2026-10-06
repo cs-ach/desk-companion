@@ -1,11 +1,9 @@
 mod desk;
 mod link;
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::{self, JoinHandle};
+use std::sync::atomic::{AtomicBool};
 
 use anyhow::{Context, Result};
 use jsrt::{Entry, Logger, Running, RunningPlugin, RustFunction, Sandbox, globals};
@@ -15,12 +13,18 @@ use crate::link::{AuthDoneReceiver, AuthDoneSender, StateReceiver, StateSender};
 
 const PLUGIN_MEMORY_LIMIT: usize = 16 * 1024 * 1024;
 
+pub type EventUpdate = (String, String, serde_json::Value);
+pub type EventSender = std::sync::mpsc::Sender<EventUpdate>;
+pub type EventReceiver = std::sync::mpsc::Receiver<EventUpdate>;
+
 struct Host {
     plugins: Vec<Arc<Plugin>>,
     store: ConfigStore,
     running: Option<Running>,
     state_tx: StateSender,
     state_rx: StateReceiver,
+    event_tx: EventSender,
+    event_rx: EventReceiver,
     auth_done_tx: AuthDoneSender,
     auth_done_rx: AuthDoneReceiver,
 }
@@ -58,6 +62,7 @@ impl Host {
         println!("\n{} file(s) to keep in sync with the device\n", manifest.files.len());
 
         let (state_tx, state_rx) = std::sync::mpsc::channel();
+        let (event_tx, event_rx) = std::sync::mpsc::channel();
         let (auth_done_tx, auth_done_rx) = std::sync::mpsc::channel();
 
         Ok(Self {
@@ -66,6 +71,8 @@ impl Host {
             running: None,
             state_tx,
             state_rx,
+            event_tx,
+            event_rx,
             auth_done_tx,
             auth_done_rx,
         })
@@ -101,12 +108,18 @@ impl Host {
     fn spawn(&self, plugin: &Arc<Plugin>) -> RunningPlugin {
         let logger = Arc::new(Logger::new(&plugin.manifest.id, &plugin.logs_dir()));
         let state_tx = self.state_tx.clone();
+        let event_tx = self.event_tx.clone();
         let shutdown = Arc::new(AtomicBool::new(false));
 
         let mut functions = Self::bindings(plugin, &logger);
         functions.push(RustFunction {
             name: "sendState",
             build: Box::new(move |ctx, plugin| desk::send_state(ctx, plugin, state_tx.clone())),
+        });
+
+        functions.push(RustFunction { 
+            name: "announce", 
+            build: Box::new(move |ctx, plugin| desk::announce(ctx, plugin, event_tx.clone()) ) 
         });
 
         let (calls, handle) = Sandbox::start_thread(
@@ -118,7 +131,7 @@ impl Host {
             Entry::Host,
         );
 
-        RunningPlugin::new(shutdown, calls, handle)
+        RunningPlugin::new(shutdown, calls, handle, plugin.manifest.clone())
     }
 
     fn start_all(&mut self) {

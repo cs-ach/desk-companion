@@ -11,7 +11,7 @@ pub fn send_state<'js>(
 ) -> rquickjs::Result<Value<'js>> {
     let module_id = plugin.manifest.id.clone();
 
-    let function = Function::new(ctx.clone(), Async(move |ctx: Ctx<'js>, name: String, state: Opt<Json>| {
+    let function = Function::new(ctx.clone(), Async(move |_: Ctx<'js>, name: String, state: Opt<Json>| {
         let module_id = module_id.clone();
         let state_tx = state_tx.clone();
 

@@ -1,6 +1,6 @@
 use base64::Engine;
 use jsrt::rquickjs::{self, Ctx, Function, Value, function::Opt};
-use rand::{Rng, RngExt};
+use rand::{RngExt};
 use sha2::{Digest, Sha256};
 
 const VERIFIER_ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";

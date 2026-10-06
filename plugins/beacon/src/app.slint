@@ -1,0 +1,11 @@
+// Beacon is a host-side test fixture and draws nothing. The shell still
+// compiles a page per plugin, so this is the smallest one that is valid.
+export component App inherits Window {
+    background: transparent;
+
+    Text {
+        text: "Beacon";
+        color: #ffffff;
+        font-size: 24px;
+    }
+}

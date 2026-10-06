@@ -267,7 +267,7 @@ impl Pi {
             Entry::Pi,
         );
 
-        RunningPlugin::new(shutdown, calls, handle)
+        RunningPlugin::new(shutdown, calls, handle, plugin.manifest.clone())
     }
 
     fn start_matching(&mut self, requires_host: bool) -> usize {

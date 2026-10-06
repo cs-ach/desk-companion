@@ -1,0 +1,6 @@
+{
+  "id": "beacon",
+  "name": "Beacon",
+  "requiresHost": true,
+  "hostTickIntervalMs": 2000
+}

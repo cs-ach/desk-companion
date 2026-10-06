@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -8,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use base64::Engine;
-use plugin::FileManifest;
+use plugin::{FileManifest};
 use protocol::frame::{FrameError, read_frame, write_frame};
 use protocol::{HostToPi, PROTOCOL_VERSION, PiToHost};
 use serialport::{ClearBuffer, SerialPort};
@@ -67,6 +66,26 @@ impl<'a> Session<'a> {
             loop {
                 match self.host.state_rx.try_recv() {
                     Ok((module_id, name, payload)) => self.send_state(module_id, name, payload)?,
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => break,
+                }
+            }
+
+            loop {
+                match self.host.event_rx.try_recv() {
+                    Ok((module_id, event, payload)) => {
+
+                        let Some(running) = self.host.running.as_ref() else {
+                            continue;
+                        };
+
+                        for plugin in running.get_all() {
+                            if plugin.manifest.subscribes.iter().any(|s| s.module_id == module_id && s.event == event) {
+                                plugin.call("onEvent".to_owned(), event.clone(), payload.clone());
+                            }
+                        }
+
+                    },
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => break,
                 }

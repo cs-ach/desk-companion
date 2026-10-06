@@ -1,0 +1,8 @@
+{
+  "id": "echo",
+  "name": "Echo",
+  "requiresHost": true,
+  "subscribes": [
+    { "module_id": "beacon", "event": "beat" }
+  ]
+}

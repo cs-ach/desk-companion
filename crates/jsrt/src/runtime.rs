@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{fs, sync::Arc, thread::JoinHandle, time::Duration};
 
-use plugin::Plugin;
+use plugin::{Manifest, Plugin};
 use rquickjs::{
     AsyncContext, AsyncRuntime, CatchResultExt, Ctx, Function, Result as JsResult, Value,
     function::IntoArgs, promise::MaybePromise,
@@ -20,11 +20,12 @@ pub struct RunningPlugin {
     shutdown: Arc<AtomicBool>,
     calls: CallSender,
     handle: JoinHandle<()>,
+    pub manifest: Manifest
 }
 
 impl RunningPlugin {
-    pub fn new(shutdown: Arc<AtomicBool>, calls: CallSender, handle: JoinHandle<()>) -> Self {
-        Self { shutdown, calls, handle }
+    pub fn new(shutdown: Arc<AtomicBool>, calls: CallSender, handle: JoinHandle<()>, manifest: Manifest) -> Self {
+        Self { shutdown, calls, handle, manifest }
     }
 
     pub fn signal(&self) {
@@ -90,6 +91,10 @@ impl Running {
         for (id, running) in self.plugins {
             running.join(&id);
         }
+    }
+
+    pub fn get_all(&self) -> impl Iterator<Item = &RunningPlugin> {
+        self.plugins.values()
     }
 }
 

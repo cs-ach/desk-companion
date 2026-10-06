@@ -5,6 +5,12 @@ const MAX_DEPTH: u32 = 32;
 
 pub struct Json(pub JsonValue);
 
+impl Default for Json {
+   fn default() -> Self {
+       Self(JsonValue::Null)
+   } 
+}
+
 impl<'js> IntoJs<'js> for Json {
     fn into_js(self, ctx: &Ctx<'js>) -> rquickjs::Result<Value<'js>> {
         match self.0 {
@@ -17,7 +23,7 @@ impl<'js> IntoJs<'js> for Json {
             JsonValue::String(s) => s.into_js(ctx),
 
             JsonValue::Array(items) => {
-                let array = Array::new(ctx.clone())?;
+                let array: Array<'js> = Array::new(ctx.clone())?;
                 for (i, item) in items.into_iter().enumerate() {
                     array.set(i, Json(item))?;
                 }
